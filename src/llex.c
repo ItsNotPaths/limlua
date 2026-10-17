@@ -42,7 +42,7 @@ static const char *const luaX_tokens [] = {
     "end", "false", "for", "function", "goto", "if",
     "in", "local", "nil", "not", "or", "repeat",
     "return", "then", "true", "until", "while",
-    "//", "..", "...", "==", ">=", "<=", "~=",
+    "//", "..", "...", "==", ">=", "<=", "!=",
     "+=", "-=", "*=", "/=", "%=", "..=",  /* compound */
     "<<", ">>", "::", "<eof>",
     "<number>", "<integer>", "<name>", "<string>"
@@ -101,6 +101,7 @@ static const char *txtToken (LexState *ls, int token) {
   switch (token) {
     case TK_NAME: case TK_STRING:
     case TK_FLT: case TK_INT:
+    case TK_NOT: case TK_AND: case TK_OR:  /* two spellings: show as written */
       save(ls, '\0');
       return luaO_pushfstring(ls->L, "'%s'", luaZ_buffer(ls->buff));
     default:
@@ -508,11 +509,6 @@ static int llex (LexState *ls, SemInfo *seminfo) {
         else if (check_next1(ls, '=')) return TK_DIVEQ;  /* compound: '/=' */
         else return '/';
       }
-      case '~': {
-        next(ls);
-        if (check_next1(ls, '=')) return TK_NE;  /* '~=' */
-        else return '~';
-      }
       case ':': {
         next(ls);
         if (check_next1(ls, ':')) return TK_DBCOLON;  /* '::' */
@@ -544,6 +540,17 @@ static int llex (LexState *ls, SemInfo *seminfo) {
       case '%': {  /* compound: '%' or '%=' */
         next(ls);
         return check_next1(ls, '=') ? TK_MODEQ : '%';
+      }
+      case '!': {  /* '!' or '!=' */
+        save_and_next(ls);
+        return check_next1(ls, '=') ? TK_NE : TK_NOT;
+      }
+      case '&': case '|': {  /* '&&' '||', or bitwise '&' '|' */
+        int c = ls->current;
+        save_and_next(ls);
+        if (ls->current != c) return c;
+        save_and_next(ls);
+        return (c == '&') ? TK_AND : TK_OR;
       }
       case '0': case '1': case '2': case '3': case '4':
       case '5': case '6': case '7': case '8': case '9': {

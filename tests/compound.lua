@@ -2,8 +2,8 @@
 
 local function syntax_err(src, near)
   local f, msg = load(src)
-  if f ~= nil then return false end
-  return near == nil or string.find(msg, near, 0, true) ~= nil
+  if f != nil then return false end
+  return near == nil or string.find(msg, near, 0, true) != nil
 end
 
 -- every operator on a local
@@ -151,7 +151,7 @@ do
   assert(syntax_err("local c <const> = 1; c += 1", "const variable 'c'"), "const target")
   assert(syntax_err("local x += 1"), "local declaration")
   assert(syntax_err("return x += 1"), "not an expression")
-  assert(load("x = 0 x += 1 y = x") ~= nil, "statements on one line")
+  assert(load("x = 0 x += 1 y = x") != nil, "statements on one line")
   assert(syntax_err("x += += 1", "'+='"), "token name")
   for _, op in ipairs{"+=", "-=", "*=", "/=", "%=", "..="} do
     assert(syntax_err("x " .. op .. " " .. op .. " 1", "'" .. op .. "'"), "token name " .. op)
@@ -173,7 +173,7 @@ do
          "binary operators unchanged")
   local a = 1
   a = 2
-  assert(a == 2 and a ~= 3, "= and == unchanged")
+  assert(a == 2 and a != 3, "= and == unchanged")
   local function v(...)
     local s = ""
     s..=...

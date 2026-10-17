@@ -2,12 +2,12 @@
 
 local function isborder(t, n)
   if n == 0 then return rawget(t, 0) == nil end
-  return rawget(t, n - 1) ~= nil and rawget(t, n) == nil
+  return rawget(t, n - 1) != nil and rawget(t, n) == nil
 end
 
 local function same(t, list)
   for i = 0, #list - 1 do
-    if t[i] ~= list[i] then return false end
+    if t[i] != list[i] then return false end
   end
   return #t == #list
 end
@@ -20,7 +20,7 @@ end
 
 local function errs(pat, f, ...)
   local ok, msg = pcall(f, ...)
-  return not ok and string.find(tostring(msg), pat, 0, true) ~= nil
+  return not ok and string.find(tostring(msg), pat, 0, true) != nil
 end
 
 -- empty table and key 0
@@ -526,13 +526,13 @@ do
   local LO, HI = -20, 300
   local function check_all(step)
     for k = LO, HI do
-      if t[k] ~= model[tostring(k)] then
+      if t[k] != model[tostring(k)] then
         error("stress mismatch at key " .. k .. " step " .. step)
       end
     end
     local n = #t
     assert((n == 0 and model["0"] == nil) or
-           (model[tostring(n - 1)] ~= nil and model[tostring(n)] == nil),
+           (model[tostring(n - 1)] != nil and model[tostring(n)] == nil),
            "stress border step " .. step)
   end
   local function check_pairs(step)
