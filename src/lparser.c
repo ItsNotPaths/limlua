@@ -1404,6 +1404,37 @@ static void restassign (LexState *ls, struct LHS_assign *lh, int nvars) {
 }
 
 
+static BinOpr compoundopr (int token) {  /* compound */
+  switch (token) {
+    case TK_ADDEQ: return OPR_ADD;
+    case TK_SUBEQ: return OPR_SUB;
+    case TK_MULEQ: return OPR_MUL;
+    case TK_DIVEQ: return OPR_DIV;
+    case TK_MODEQ: return OPR_MOD;
+    case TK_CATEQ: return OPR_CONCAT;
+    default: return OPR_NOBINOPR;
+  }
+}
+
+
+/* compound: 'v op= e' is 'v = v op (e)'; 'v' was read once by the caller */
+static void compoundassign (LexState *ls, expdesc *v, BinOpr op) {
+  FuncState *fs = ls->fs;
+  int top = fs->freereg;
+  int line = ls->linenumber;
+  expdesc e1 = *v, e2;
+  check_condition(ls, vkisvar(v->k), "syntax error");
+  check_readonly(ls, v);
+  luaX_next(ls);  /* skip operator */
+  luaK_dischargevars(fs, &e1);
+  fs->freereg = top;  /* keep the target's table and key for the store */
+  luaK_infix(fs, op, &e1);
+  expr(ls, &e2);
+  luaK_posfix(fs, op, &e1, &e2, line);
+  luaK_storevar(fs, v, &e1);
+}
+
+
 static int cond (LexState *ls) {
   /* cond -> exp */
   expdesc v;
@@ -1794,14 +1825,17 @@ static void funcstat (LexState *ls, int line) {
 
 
 static void exprstat (LexState *ls) {
-  /* stat -> func | assignment */
+  /* stat -> func | assignment | compoundassign */
   FuncState *fs = ls->fs;
   struct LHS_assign v;
+  BinOpr op;
   suffixedexp(ls, &v.v);
   if (ls->t.token == '=' || ls->t.token == ',') { /* stat -> assignment ? */
     v.prev = NULL;
     restassign(ls, &v, 1);
   }
+  else if ((op = compoundopr(ls->t.token)) != OPR_NOBINOPR)  /* compound */
+    compoundassign(ls, &v.v, op);
   else {  /* stat -> func */
     Instruction *inst;
     check_condition(ls, v.v.k == VCALL, "syntax error");

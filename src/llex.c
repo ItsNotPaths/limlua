@@ -43,6 +43,7 @@ static const char *const luaX_tokens [] = {
     "in", "local", "nil", "not", "or", "repeat",
     "return", "then", "true", "until", "while",
     "//", "..", "...", "==", ">=", "<=", "~=",
+    "+=", "-=", "*=", "/=", "%=", "..=",  /* compound */
     "<<", ">>", "::", "<eof>",
     "<number>", "<integer>", "<name>", "<string>"
 };
@@ -454,8 +455,9 @@ static int llex (LexState *ls, SemInfo *seminfo) {
         next(ls);
         break;
       }
-      case '-': {  /* '-' or '--' (comment) */
+      case '-': {  /* '-', '-=' or '--' (comment) */
         next(ls);
+        if (check_next1(ls, '=')) return TK_SUBEQ;  /* compound */
         if (ls->current != '-') return '-';
         /* else is a comment */
         next(ls);
@@ -503,6 +505,7 @@ static int llex (LexState *ls, SemInfo *seminfo) {
       case '/': {
         next(ls);
         if (check_next1(ls, '/')) return TK_IDIV;  /* '//' */
+        else if (check_next1(ls, '=')) return TK_DIVEQ;  /* compound: '/=' */
         else return '/';
       }
       case '~': {
@@ -524,10 +527,23 @@ static int llex (LexState *ls, SemInfo *seminfo) {
         if (check_next1(ls, '.')) {
           if (check_next1(ls, '.'))
             return TK_DOTS;   /* '...' */
+          else if (check_next1(ls, '=')) return TK_CATEQ;  /* compound */
           else return TK_CONCAT;   /* '..' */
         }
         else if (!lisdigit(ls->current)) return '.';
         else return read_numeral(ls, seminfo);
+      }
+      case '+': {  /* compound: '+' or '+=' */
+        next(ls);
+        return check_next1(ls, '=') ? TK_ADDEQ : '+';
+      }
+      case '*': {  /* compound: '*' or '*=' */
+        next(ls);
+        return check_next1(ls, '=') ? TK_MULEQ : '*';
+      }
+      case '%': {  /* compound: '%' or '%=' */
+        next(ls);
+        return check_next1(ls, '=') ? TK_MODEQ : '%';
       }
       case '0': case '1': case '2': case '3': case '4':
       case '5': case '6': case '7': case '8': case '9': {
@@ -551,7 +567,7 @@ static int llex (LexState *ls, SemInfo *seminfo) {
             return TK_NAME;
           }
         }
-        else {  /* single-char tokens ('+', '*', '%', '{', '}', ...) */
+        else {  /* single-char tokens ('#', '{', '}', ...) */
           int c = ls->current;
           next(ls);
           return c;
