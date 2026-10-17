@@ -666,13 +666,14 @@ LUALIB_API char *luaL_buffinitsize (lua_State *L, luaL_Buffer *B, size_t sz) {
 ** =======================================================
 */
 
-/* index of free-list header (after the predefined values) */
-#define freelist	(LUA_RIDX_LAST + 1)
+/* index of free-list header (0-based: the registry keeps it set) */
+#define freelist	0
 
 /*
 ** The previously freed references form a linked list:
 ** t[freelist] is the index of a first free index, or zero if list is
 ** empty; t[t[freelist]] is the index of the second element; etc.
+** As t[freelist] is present, '#t' is always a new, positive reference.
 */
 LUALIB_API int luaL_ref (lua_State *L, int t) {
   int ref;
@@ -696,7 +697,7 @@ LUALIB_API int luaL_ref (lua_State *L, int t) {
     lua_rawseti(L, t, freelist);  /* (t[freelist] = t[ref]) */
   }
   else  /* no free elements */
-    ref = (int)lua_rawlen(L, t) + 1;  /* get a new reference */
+    ref = (int)lua_rawlen(L, t);  /* 0-based: get a new reference */
   lua_rawseti(L, t, ref);
   return ref;
 }

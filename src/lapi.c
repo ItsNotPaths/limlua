@@ -660,7 +660,7 @@ l_sinline int auxgetstr (lua_State *L, const TValue *t, const char *k) {
 ** part of the registry.
 */
 #define getGtable(L)  \
-	(&hvalue(&G(L)->l_registry)->array[LUA_RIDX_GLOBALS - 1])
+	(&hvalue(&G(L)->l_registry)->array[LUA_RIDX_GLOBALS])  /* 0-based */
 
 
 LUA_API int lua_getglobal (lua_State *L, const char *name) {

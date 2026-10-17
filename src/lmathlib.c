@@ -582,12 +582,14 @@ static int math_random (lua_State *L) {
       return 1;
     }
     case 1: {  /* only upper limit */
-      low = 1;
+      low = 0;  /* 0-based */
       up = luaL_checkinteger(L, 1);
       if (up == 0) {  /* single 0 as argument? */
         lua_pushinteger(L, I2UInt(rv));  /* full random integer */
         return 1;
       }
+      luaL_argcheck(L, up > 0, 1, "interval is empty");  /* 0-based */
+      up--;  /* 0-based: [0, n - 1] */
       break;
     }
     case 2: {  /* lower and upper limits */

@@ -42,12 +42,12 @@ typedef unsigned long utfint;
 #define iscontp(p)	iscont(*(p))
 
 
-/* from strlib */
-/* translate a relative string position: negative means back from end */
+/* translate a relative 0-based string position: negative means back
+** from end; -1 if before the start */
 static lua_Integer u_posrelat (lua_Integer pos, size_t len) {
   if (pos >= 0) return pos;
-  else if (0u - (size_t)pos > len) return 0;
-  else return (lua_Integer)len + pos + 1;
+  else if (0u - (size_t)pos > len) return -1;  /* 0-based */
+  else return (lua_Integer)len + pos;  /* 0-based */
 }
 
 
@@ -99,18 +99,18 @@ static int utflen (lua_State *L) {
   lua_Integer n = 0;  /* counter for the number of characters */
   size_t len;  /* string length in bytes */
   const char *s = luaL_checklstring(L, 1, &len);
-  lua_Integer posi = u_posrelat(luaL_optinteger(L, 2, 1), len);
+  lua_Integer posi = u_posrelat(luaL_optinteger(L, 2, 0), len);  /* 0-based */
   lua_Integer posj = u_posrelat(luaL_optinteger(L, 3, -1), len);
   int lax = lua_toboolean(L, 4);
-  luaL_argcheck(L, 1 <= posi && --posi <= (lua_Integer)len, 2,
+  luaL_argcheck(L, 0 <= posi && posi <= (lua_Integer)len, 2,  /* 0-based */
                    "initial position out of bounds");
-  luaL_argcheck(L, --posj < (lua_Integer)len, 3,
+  luaL_argcheck(L, posj < (lua_Integer)len, 3,  /* 0-based */
                    "final position out of bounds");
   while (posi <= posj) {
     const char *s1 = utf8_decode(s + posi, NULL, !lax);
     if (s1 == NULL) {  /* conversion error? */
       luaL_pushfail(L);  /* return fail ... */
-      lua_pushinteger(L, posi + 1);  /* ... and current position */
+      lua_pushinteger(L, posi);  /* 0-based: ... and current position */
       return 2;
     }
     posi = s1 - s;
@@ -128,21 +128,21 @@ static int utflen (lua_State *L) {
 static int codepoint (lua_State *L) {
   size_t len;
   const char *s = luaL_checklstring(L, 1, &len);
-  lua_Integer posi = u_posrelat(luaL_optinteger(L, 2, 1), len);
+  lua_Integer posi = u_posrelat(luaL_optinteger(L, 2, 0), len);  /* 0-based */
   lua_Integer pose = u_posrelat(luaL_optinteger(L, 3, posi), len);
   int lax = lua_toboolean(L, 4);
   int n;
   const char *se;
-  luaL_argcheck(L, posi >= 1, 2, "out of bounds");
-  luaL_argcheck(L, pose <= (lua_Integer)len, 3, "out of bounds");
+  luaL_argcheck(L, posi >= 0, 2, "out of bounds");  /* 0-based */
+  luaL_argcheck(L, pose < (lua_Integer)len, 3, "out of bounds");  /* 0-based */
   if (posi > pose) return 0;  /* empty interval; return no values */
   if (pose - posi >= INT_MAX)  /* (lua_Integer -> int) overflow? */
     return luaL_error(L, "string slice too long");
   n = (int)(pose -  posi) + 1;  /* upper bound for number of returns */
   luaL_checkstack(L, n, "string slice too long");
   n = 0;  /* count the number of returns */
-  se = s + pose;  /* string end */
-  for (s += posi - 1; s < se;) {
+  se = s + pose + 1;  /* 0-based: string end */
+  for (s += posi; s < se;) {
     utfint code;
     s = utf8_decode(s, &code, !lax);
     if (s == NULL)
@@ -190,9 +190,9 @@ static int byteoffset (lua_State *L) {
   size_t len;
   const char *s = luaL_checklstring(L, 1, &len);
   lua_Integer n  = luaL_checkinteger(L, 2);
-  lua_Integer posi = (n >= 0) ? 1 : len + 1;
+  lua_Integer posi = (n >= 0) ? 0 : len;  /* 0-based */
   posi = u_posrelat(luaL_optinteger(L, 3, posi), len);
-  luaL_argcheck(L, 1 <= posi && --posi <= (lua_Integer)len, 3,
+  luaL_argcheck(L, 0 <= posi && posi <= (lua_Integer)len, 3,  /* 0-based */
                    "position out of bounds");
   if (n == 0) {
     /* find beginning of current byte sequence */
@@ -220,7 +220,7 @@ static int byteoffset (lua_State *L) {
      }
   }
   if (n == 0)  /* did it find given character? */
-    lua_pushinteger(L, posi + 1);
+    lua_pushinteger(L, posi);  /* 0-based */
   else  /* no such character */
     luaL_pushfail(L);
   return 1;
@@ -230,7 +230,7 @@ static int byteoffset (lua_State *L) {
 static int iter_aux (lua_State *L, int strict) {
   size_t len;
   const char *s = luaL_checklstring(L, 1, &len);
-  lua_Unsigned n = (lua_Unsigned)lua_tointeger(L, 2);
+  lua_Unsigned n = (lua_Unsigned)lua_tointeger(L, 2) + 1u;  /* 0-based */
   if (n < len) {
     while (iscontp(s + n)) n++;  /* go to next character */
   }
@@ -241,7 +241,7 @@ static int iter_aux (lua_State *L, int strict) {
     const char *next = utf8_decode(s + n, &code, strict);
     if (next == NULL || iscontp(next))
       return luaL_error(L, MSGInvalid);
-    lua_pushinteger(L, n + 1);
+    lua_pushinteger(L, n);  /* 0-based */
     lua_pushinteger(L, code);
     return 2;
   }
@@ -263,7 +263,7 @@ static int iter_codes (lua_State *L) {
   luaL_argcheck(L, !iscontp(s), 1, MSGInvalid);
   lua_pushcfunction(L, lax ? iter_auxlax : iter_auxstrict);
   lua_pushvalue(L, 1);
-  lua_pushinteger(L, 0);
+  lua_pushinteger(L, -1);  /* 0-based */
   return 3;
 }
 

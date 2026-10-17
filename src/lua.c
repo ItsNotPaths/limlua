@@ -239,13 +239,13 @@ static int dolibrary (lua_State *L, char *globname) {
 
 
 /*
-** Push on the stack the contents of table 'arg' from 1 to #arg
+** Push on the stack the contents of table 'arg' from 1 to #arg - 1
 */
 static int pushargs (lua_State *L) {
   int i, n;
   if (lua_getglobal(L, "arg") != LUA_TTABLE)
     luaL_error(L, "'arg' is not a table");
-  n = (int)luaL_len(L, -1);
+  n = (int)luaL_len(L, -1) - 1;  /* 0-based: arg[0] is the script */
   luaL_checkstack(L, n + 3, "too many arguments to script");
   for (i = 1; i <= n; i++)
     lua_rawgeti(L, -i, i);

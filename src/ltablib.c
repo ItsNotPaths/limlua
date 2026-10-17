@@ -60,8 +60,7 @@ static void checktab (lua_State *L, int arg, int what) {
 
 static int tinsert (lua_State *L) {
   lua_Integer pos;  /* where to insert new element */
-  lua_Integer e = aux_getn(L, 1, TAB_RW);
-  e = luaL_intop(+, e, 1);  /* first empty element */
+  lua_Integer e = aux_getn(L, 1, TAB_RW);  /* 0-based: first empty element */
   switch (lua_gettop(L)) {
     case 2: {  /* called with only 2 arguments */
       pos = e;  /* insert new element at the end */
@@ -70,8 +69,8 @@ static int tinsert (lua_State *L) {
     case 3: {
       lua_Integer i;
       pos = luaL_checkinteger(L, 2);  /* 2nd argument is the position */
-      /* check whether 'pos' is in [1, e] */
-      luaL_argcheck(L, (lua_Unsigned)pos - 1u < (lua_Unsigned)e, 2,
+      /* 0-based: check whether 'pos' is in [0, e] */
+      luaL_argcheck(L, (lua_Unsigned)pos <= (lua_Unsigned)e, 2,
                        "position out of bounds");
       for (i = e; i > pos; i--) {  /* move up elements */
         lua_geti(L, 1, i - 1);
@@ -89,14 +88,14 @@ static int tinsert (lua_State *L) {
 
 
 static int tremove (lua_State *L) {
-  lua_Integer size = aux_getn(L, 1, TAB_RW);
-  lua_Integer pos = luaL_optinteger(L, 2, size);
-  if (pos != size)  /* validate 'pos' if given */
-    /* check whether 'pos' is in [1, size + 1] */
-    luaL_argcheck(L, (lua_Unsigned)pos - 1u <= (lua_Unsigned)size, 2,
+  lua_Integer last = aux_getn(L, 1, TAB_RW) - 1;  /* 0-based */
+  lua_Integer pos = luaL_optinteger(L, 2, last);
+  if (pos != last)  /* validate 'pos' if given */
+    /* 0-based: check whether 'pos' is in [0, last + 1] */
+    luaL_argcheck(L, (lua_Unsigned)pos <= (lua_Unsigned)last + 1u, 2,
                      "position out of bounds");
   lua_geti(L, 1, pos);  /* result = t[pos] */
-  for ( ; pos < size; pos++) {
+  for ( ; pos < last; pos++) {
     lua_geti(L, 1, pos + 1);
     lua_seti(L, 1, pos);  /* t[pos] = t[pos + 1] */
   }
@@ -155,10 +154,10 @@ static void addfield (lua_State *L, luaL_Buffer *b, lua_Integer i) {
 
 static int tconcat (lua_State *L) {
   luaL_Buffer b;
-  lua_Integer last = aux_getn(L, 1, TAB_R);
+  lua_Integer last = aux_getn(L, 1, TAB_R) - 1;  /* 0-based */
   size_t lsep;
   const char *sep = luaL_optlstring(L, 2, "", &lsep);
-  lua_Integer i = luaL_optinteger(L, 3, 1);
+  lua_Integer i = luaL_optinteger(L, 3, 0);  /* 0-based */
   last = luaL_optinteger(L, 4, last);
   luaL_buffinit(L, &b);
   for (; i < last; i++) {
@@ -184,7 +183,7 @@ static int tpack (lua_State *L) {
   lua_createtable(L, n, 1);  /* create result table */
   lua_insert(L, 1);  /* put it at index 1 */
   for (i = n; i >= 1; i--)  /* assign elements */
-    lua_seti(L, 1, i);
+    lua_seti(L, 1, i - 1);  /* 0-based */
   lua_pushinteger(L, n);
   lua_setfield(L, 1, "n");  /* t.n = number of elements */
   return 1;  /* return table */
@@ -193,8 +192,8 @@ static int tpack (lua_State *L) {
 
 static int tunpack (lua_State *L) {
   lua_Unsigned n;
-  lua_Integer i = luaL_optinteger(L, 2, 1);
-  lua_Integer e = luaL_opt(L, luaL_checkinteger, 3, luaL_len(L, 1));
+  lua_Integer i = luaL_optinteger(L, 2, 0);  /* 0-based */
+  lua_Integer e = luaL_opt(L, luaL_checkinteger, 3, luaL_len(L, 1) - 1);
   if (i > e) return 0;  /* empty range */
   n = (lua_Unsigned)e - i;  /* number of elements minus 1 (avoid overflows) */
   if (l_unlikely(n >= (unsigned int)INT_MAX  ||
@@ -403,7 +402,7 @@ static int sort (lua_State *L) {
     if (!lua_isnoneornil(L, 2))  /* is there a 2nd argument? */
       luaL_checktype(L, 2, LUA_TFUNCTION);  /* must be a function */
     lua_settop(L, 2);  /* make sure there are two arguments */
-    auxsort(L, 1, (IdxT)n, 0);
+    auxsort(L, 0, (IdxT)n - 1, 0);  /* 0-based */
   }
   return 0;
 }

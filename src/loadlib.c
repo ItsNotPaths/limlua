@@ -335,14 +335,14 @@ static void *checkclib (lua_State *L, const char *path) {
 
 /*
 ** registry.CLIBS[path] = plib        -- for queries
-** registry.CLIBS[#CLIBS + 1] = plib  -- also keep a list of all libraries
+** registry.CLIBS[#CLIBS] = plib  -- also keep a list of all libraries
 */
 static void addtoclib (lua_State *L, const char *path, void *plib) {
   lua_getfield(L, LUA_REGISTRYINDEX, CLIBS);
   lua_pushlightuserdata(L, plib);
   lua_pushvalue(L, -1);
   lua_setfield(L, -3, path);  /* CLIBS[path] = plib */
-  lua_rawseti(L, -2, luaL_len(L, -2) + 1);  /* CLIBS[#CLIBS + 1] = plib */
+  lua_rawseti(L, -2, luaL_len(L, -2));  /* 0-based: CLIBS[#CLIBS] = plib */
   lua_pop(L, 1);  /* pop CLIBS table */
 }
 
@@ -352,8 +352,8 @@ static void addtoclib (lua_State *L, const char *path, void *plib) {
 ** handles in list CLIBS
 */
 static int gctm (lua_State *L) {
-  lua_Integer n = luaL_len(L, 1);
-  for (; n >= 1; n--) {  /* for each handle, in reverse order */
+  lua_Integer n = luaL_len(L, 1) - 1;  /* 0-based */
+  for (; n >= 0; n--) {  /* for each handle, in reverse order */
     lua_rawgeti(L, 1, n);  /* get handle CLIBS[n] */
     lsys_unloadlib(lua_touserdata(L, -1));
     lua_pop(L, 1);  /* pop handle */
@@ -621,7 +621,7 @@ static void findloader (lua_State *L, const char *name) {
     luaL_error(L, "'package.searchers' must be a table");
   luaL_buffinit(L, &msg);
   /*  iterate over available searchers to find a loader */
-  for (i = 1; ; i++) {
+  for (i = 0; ; i++) {  /* 0-based */
     luaL_addstring(&msg, "\n\t");  /* error-message prefix */
     if (l_unlikely(lua_rawgeti(L, 3, i) == LUA_TNIL)) {  /* no more searchers? */
       lua_pop(L, 1);  /* remove nil */
@@ -713,7 +713,7 @@ static void createsearcherstable (lua_State *L) {
   for (i=0; searchers[i] != NULL; i++) {
     lua_pushvalue(L, -2);  /* set 'package' as upvalue for all searchers */
     lua_pushcclosure(L, searchers[i], 1);
-    lua_rawseti(L, -2, i+1);
+    lua_rawseti(L, -2, i);  /* 0-based */
   }
   lua_setfield(L, -2, "searchers");  /* put it in field 'searchers' */
 }

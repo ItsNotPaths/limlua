@@ -61,18 +61,16 @@ static int str_len (lua_State *L) {
 
 
 /*
-** translate a relative initial string position
-** (negative means back from end): clip result to [1, inf).
+** translate a relative initial string position (0-based; negative
+** means back from end) into a 1-based one: clip result to [1, inf).
 ** The length of any string in Lua must fit in a lua_Integer,
 ** so there are no overflows in the casts.
 ** The inverted comparison avoids a possible overflow
 ** computing '-pos'.
 */
 static size_t posrelatI (lua_Integer pos, size_t len) {
-  if (pos > 0)
-    return (size_t)pos;
-  else if (pos == 0)
-    return 1;
+  if (pos >= 0)
+    return (size_t)pos + 1;  /* 0-based */
   else if (pos < -(lua_Integer)len)  /* inverted comparison */
     return 1;  /* clip to 1 */
   else return len + (size_t)pos + 1;
@@ -80,17 +78,17 @@ static size_t posrelatI (lua_Integer pos, size_t len) {
 
 
 /*
-** Gets an optional ending string position from argument 'arg',
-** with default value 'def'.
+** Gets an optional ending string position (0-based, inclusive) from
+** argument 'arg', with default value 'def', as a 1-based one.
 ** Negative means back from end: clip result to [0, len]
 */
 static size_t getendpos (lua_State *L, int arg, lua_Integer def,
                          size_t len) {
   lua_Integer pos = luaL_optinteger(L, arg, def);
-  if (pos > (lua_Integer)len)
+  if (pos >= (lua_Integer)len)  /* 0-based */
     return len;
   else if (pos >= 0)
-    return (size_t)pos;
+    return (size_t)pos + 1;  /* 0-based */
   else if (pos < -(lua_Integer)len)
     return 0;
   else return len + (size_t)pos + 1;
@@ -177,7 +175,7 @@ static int str_rep (lua_State *L) {
 static int str_byte (lua_State *L) {
   size_t l;
   const char *s = luaL_checklstring(L, 1, &l);
-  lua_Integer pi = luaL_optinteger(L, 2, 1);
+  lua_Integer pi = luaL_optinteger(L, 2, 0);  /* 0-based */
   size_t posi = posrelatI(pi, l);
   size_t pose = getendpos(L, 3, pi, l);
   int n, i;
@@ -712,8 +710,8 @@ static size_t get_onecapture (MatchState *ms, int i, const char *s,
     *cap = ms->capture[i].init;
     if (l_unlikely(capl == CAP_UNFINISHED))
       luaL_error(ms->L, "unfinished capture");
-    else if (capl == CAP_POSITION)
-      lua_pushinteger(ms->L, (ms->capture[i].init - ms->src_init) + 1);
+    else if (capl == CAP_POSITION)  /* 0-based */
+      lua_pushinteger(ms->L, ms->capture[i].init - ms->src_init);
     return capl;
   }
 }
@@ -773,7 +771,7 @@ static int str_find_aux (lua_State *L, int find) {
   size_t ls, lp;
   const char *s = luaL_checklstring(L, 1, &ls);
   const char *p = luaL_checklstring(L, 2, &lp);
-  size_t init = posrelatI(luaL_optinteger(L, 3, 1), ls) - 1;
+  size_t init = posrelatI(luaL_optinteger(L, 3, 0), ls) - 1;  /* 0-based */
   if (init > ls) {  /* start after string's end? */
     luaL_pushfail(L);  /* cannot find anything */
     return 1;
@@ -783,8 +781,8 @@ static int str_find_aux (lua_State *L, int find) {
     /* do a plain search */
     const char *s2 = lmemfind(s + init, ls - init, p, lp);
     if (s2) {
-      lua_pushinteger(L, (s2 - s) + 1);
-      lua_pushinteger(L, (s2 - s) + lp);
+      lua_pushinteger(L, s2 - s);  /* 0-based */
+      lua_pushinteger(L, (s2 - s) + lp - 1);  /* 0-based, inclusive */
       return 2;
     }
   }
@@ -801,8 +799,8 @@ static int str_find_aux (lua_State *L, int find) {
       reprepstate(&ms);
       if ((res=match(&ms, s1, p)) != NULL) {
         if (find) {
-          lua_pushinteger(L, (s1 - s) + 1);  /* start */
-          lua_pushinteger(L, res - s);   /* end */
+          lua_pushinteger(L, s1 - s);  /* 0-based: start */
+          lua_pushinteger(L, (res - s) - 1);   /* 0-based: end */
           return push_captures(&ms, NULL, 0) + 2;
         }
         else
@@ -854,7 +852,7 @@ static int gmatch (lua_State *L) {
   size_t ls, lp;
   const char *s = luaL_checklstring(L, 1, &ls);
   const char *p = luaL_checklstring(L, 2, &lp);
-  size_t init = posrelatI(luaL_optinteger(L, 3, 1), ls) - 1;
+  size_t init = posrelatI(luaL_optinteger(L, 3, 0), ls) - 1;  /* 0-based */
   GMatchState *gm;
   lua_settop(L, 2);  /* keep strings on closure to avoid being collected */
   gm = (GMatchState *)lua_newuserdatauv(L, sizeof(GMatchState), 0);
@@ -1755,7 +1753,7 @@ static int str_unpack (lua_State *L) {
   const char *fmt = luaL_checkstring(L, 1);
   size_t ld;
   const char *data = luaL_checklstring(L, 2, &ld);
-  size_t pos = posrelatI(luaL_optinteger(L, 3, 1), ld) - 1;
+  size_t pos = posrelatI(luaL_optinteger(L, 3, 0), ld) - 1;  /* 0-based */
   int n = 0;  /* number of results */
   luaL_argcheck(L, pos <= ld, 3, "initial position out of string");
   initheader(L, &h);
@@ -1819,7 +1817,7 @@ static int str_unpack (lua_State *L) {
     }
     pos += size;
   }
-  lua_pushinteger(L, pos + 1);  /* next position */
+  lua_pushinteger(L, pos);  /* 0-based: next position */
   return n + 1;
 }
 

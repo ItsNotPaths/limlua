@@ -15,7 +15,7 @@
 ** Tables keep its elements in two parts: an array part and a hash part.
 ** Non-negative integer keys are all candidates to be kept in the array
 ** part. The actual size of the array is the largest 'n' such that
-** more than half the slots between 1 and n are in use.
+** more than half the slots between 0 and n - 1 are in use. (0-based)
 ** Hash uses a mix of chained scatter table with Brent's variation.
 ** A main invariant of these tables is that, if an element is not
 ** in its main position (i.e. the 'original' position that its hash gives
@@ -312,12 +312,12 @@ static const TValue *getgeneric (Table *t, const TValue *key, int deadok) {
 
 
 /*
-** returns the index for 'k' if 'k' is an appropriate key to live in
-** the array part of a table, 0 otherwise.
+** returns 'k + 1' if 'k' is an appropriate key to live in the array
+** part of a table, 0 otherwise. ('k' lives in 'array[k]'.)
 */
 static unsigned int arrayindex (lua_Integer k) {
-  if (l_castS2U(k) - 1u < MAXASIZE)  /* 'k' in [1, MAXASIZE]? */
-    return cast_uint(k);  /* 'key' is an appropriate array index */
+  if (l_castS2U(k) < MAXASIZE)  /* 0-based: 'k' in [0, MAXASIZE - 1]? */
+    return cast_uint(k) + 1u;  /* 0-based */
   else
     return 0;
 }
@@ -351,7 +351,7 @@ int luaH_next (lua_State *L, Table *t, StkId key) {
   unsigned int i = findindex(L, t, s2v(key), asize);  /* find original key */
   for (; i < asize; i++) {  /* try first array part */
     if (!isempty(&t->array[i])) {  /* a non-empty entry? */
-      setivalue(s2v(key), i + 1);
+      setivalue(s2v(key), i);  /* 0-based */
       setobj2s(L, key + 1, &t->array[i]);
       return 1;
     }
@@ -382,11 +382,12 @@ static void freehash (lua_State *L, Table *t) {
 
 /*
 ** Compute the optimal size for the array part of table 't'. 'nums' is a
-** "count array" where 'nums[i]' is the number of integers in the table
-** between 2^(i - 1) + 1 and 2^i. 'pna' enters with the total number of
-** integer keys in the table and leaves with the number of keys that
-** will go to the array part; return the optimal size.  (The condition
-** 'twotoi > 0' in the for loop stops the loop if 'twotoi' overflows.)
+** "count array" where 'nums[i]' is the number of integer keys 'k' in
+** the table with 2^(i - 1) < k + 1 <= 2^i (0-based). 'pna' enters with
+** the total number of integer keys in the table and leaves with the
+** number of keys that will go to the array part; return the optimal
+** size. (The condition 'twotoi > 0' in the for loop stops the loop if
+** 'twotoi' overflows.)
 */
 static unsigned int computesizes (unsigned int nums[], unsigned int *pna) {
   int i;
@@ -430,7 +431,7 @@ static unsigned int numusearray (const Table *t, unsigned int *nums) {
   int lg;
   unsigned int ttlg;  /* 2^lg */
   unsigned int ause = 0;  /* summation of 'nums' */
-  unsigned int i = 1;  /* count to traverse all array keys */
+  unsigned int i = 1;  /* 0-based: 1 + key, to traverse all array keys */
   unsigned int asize = limitasasize(t);  /* real array size */
   /* traverse each slice */
   for (lg = 0, ttlg = 1; lg <= MAXABITS; lg++, ttlg *= 2) {
@@ -441,7 +442,7 @@ static unsigned int numusearray (const Table *t, unsigned int *nums) {
       if (i > lim)
         break;  /* no more elements to count */
     }
-    /* count elements in range (2^(lg - 1), 2^lg] */
+    /* count keys 'k' with 'k + 1' in range (2^(lg - 1), 2^lg] */
     for (; i <= lim; i++) {
       if (!isempty(&t->array[i-1]))
         lc++;
@@ -564,7 +565,7 @@ void luaH_resize (lua_State *L, Table *t, unsigned int newasize,
     /* re-insert into the new hash the elements from vanishing slice */
     for (i = newasize; i < oldasize; i++) {
       if (!isempty(&t->array[i]))
-        luaH_setint(L, t, i + 1, &t->array[i]);
+        luaH_setint(L, t, i, &t->array[i]);  /* 0-based */
     }
     t->alimit = oldasize;  /* restore current size... */
     exchangehashpart(t, &newt);  /* and hash (in case of errors) */
@@ -593,7 +594,7 @@ void luaH_resizearray (lua_State *L, Table *t, unsigned int nasize) {
 }
 
 /*
-** nums[i] = number of keys 'k' where 2^(i - 1) < k <= 2^i
+** nums[i] = number of keys 'k' where 2^(i - 1) < k + 1 <= 2^i (0-based)
 */
 static void rehash (lua_State *L, Table *t, const TValue *ek) {
   unsigned int asize;  /* optimal size for array part */
@@ -724,32 +725,32 @@ static void luaH_newkey (lua_State *L, Table *t, const TValue *key,
 ** Search function for integers. If integer is inside 'alimit', get it
 ** directly from the array part. Otherwise, if 'alimit' is not
 ** the real size of the array, the key still can be in the array part.
-** In this case, do the "Xmilia trick" to check whether 'key-1' is
-** smaller than the real size.
+** In this case, do the "Xmilia trick" to check whether 'key' is
+** smaller than the real size. (0-based: key 'k' lives in 'array[k]'.)
 ** The trick works as follow: let 'p' be an integer such that
 **   '2^(p+1) >= alimit > 2^p', or  '2^(p+1) > alimit-1 >= 2^p'.
 ** That is, 2^(p+1) is the real size of the array, and 'p' is the highest
-** bit on in 'alimit-1'. What we have to check becomes 'key-1 < 2^(p+1)'.
-** We compute '(key-1) & ~(alimit-1)', which we call 'res'; it will
+** bit on in 'alimit-1'. What we have to check becomes 'key < 2^(p+1)'.
+** We compute 'key & ~(alimit-1)', which we call 'res'; it will
 ** have the 'p' bit cleared. If the key is outside the array, that is,
-** 'key-1 >= 2^(p+1)', then 'res' will have some bit on higher than 'p',
+** 'key >= 2^(p+1)', then 'res' will have some bit on higher than 'p',
 ** therefore it will be larger or equal to 'alimit', and the check
-** will fail. If 'key-1 < 2^(p+1)', then 'res' has no bit on higher than
+** will fail. If 'key < 2^(p+1)', then 'res' has no bit on higher than
 ** 'p', and as the bit 'p' itself was cleared, 'res' will be smaller
 ** than 2^p, therefore smaller than 'alimit', and the check succeeds.
 ** As special cases, when 'alimit' is 0 the condition is trivially false,
-** and when 'alimit' is 1 the condition simplifies to 'key-1 < alimit'.
-** If key is 0 or negative, 'res' will have its higher bit on, so that
+** and when 'alimit' is 1 the condition simplifies to 'key < alimit'.
+** If key is negative, 'res' will have its higher bit on, so that
 ** if cannot be smaller than alimit.
 */
 const TValue *luaH_getint (Table *t, lua_Integer key) {
   lua_Unsigned alimit = t->alimit;
-  if (l_castS2U(key) - 1u < alimit)  /* 'key' in [1, t->alimit]? */
-    return &t->array[key - 1];
+  if (l_castS2U(key) < alimit)  /* 0-based: 'key' in [0, t->alimit - 1]? */
+    return &t->array[key];
   else if (!isrealasize(t) &&  /* key still may be in the array part? */
-           (((l_castS2U(key) - 1u) & ~(alimit - 1u)) < alimit)) {
-    t->alimit = cast_uint(key);  /* probably '#t' is here now */
-    return &t->array[key - 1];
+           ((l_castS2U(key) & ~(alimit - 1u)) < alimit)) {  /* 0-based */
+    t->alimit = cast_uint(key) + 1u;  /* probably '#t' is here now */
+    return &t->array[key];
   }
   else {  /* key is not in the array part; check the hash */
     Node *n = hashint(t, key);
@@ -855,17 +856,17 @@ void luaH_setint (lua_State *L, Table *t, lua_Integer key, TValue *value) {
 
 
 /*
-** Try to find a boundary in the hash part of table 't'. From the
-** caller, we know that 'j' is zero or present and that 'j + 1' is
-** present. We want to find a larger key that is absent from the
-** table, so that we can do a binary search between the two keys to
+** Try to find a boundary in the hash part of table 't'. (0-based: here
+** an index 'n' stands for key 'n - 1', so a boundary 'n' is a count.)
+** From the caller, we know that 'j' is zero or present and that 'j + 1'
+** is present. We want to find a larger index that is absent from the
+** table, so that we can do a binary search between the two indices to
 ** find a boundary. We keep doubling 'j' until we get an absent index.
 ** If the doubling would overflow, we try LUA_MAXINTEGER. If it is
 ** absent, we are ready for the binary search. ('j', being max integer,
 ** is larger or equal to 'i', but it cannot be equal because it is
-** absent while 'i' is present; so 'j > i'.) Otherwise, 'j' is a
-** boundary. ('j + 1' cannot be a present integer key because it is
-** not a valid integer in Lua.)
+** absent while 'i' is present; so 'j > i'.) Otherwise, 'j' is taken
+** as a boundary, as a larger count cannot be represented.
 */
 static lua_Unsigned hash_search (Table *t, lua_Unsigned j) {
   lua_Unsigned i;
@@ -876,16 +877,16 @@ static lua_Unsigned hash_search (Table *t, lua_Unsigned j) {
       j *= 2;
     else {
       j = LUA_MAXINTEGER;
-      if (isempty(luaH_getint(t, j)))  /* t[j] not present? */
+      if (isempty(luaH_getint(t, j - 1)))  /* 0-based: t[j - 1] not present? */
         break;  /* 'j' now is an absent index */
       else  /* weird case */
         return j;  /* well, max integer is a boundary... */
     }
-  } while (!isempty(luaH_getint(t, j)));  /* repeat until an absent t[j] */
-  /* i < j  &&  t[i] present  &&  t[j] absent */
+  } while (!isempty(luaH_getint(t, j - 1)));  /* 0-based: until t[j-1] absent */
+  /* i < j  &&  t[i - 1] present  &&  t[j - 1] absent */
   while (j - i > 1u) {  /* do a binary search between them */
     lua_Unsigned m = (i + j) / 2;
-    if (isempty(luaH_getint(t, m))) j = m;
+    if (isempty(luaH_getint(t, m - 1))) j = m;  /* 0-based */
     else i = m;
   }
   return i;
@@ -904,16 +905,16 @@ static unsigned int binsearch (const TValue *array, unsigned int i,
 
 
 /*
-** Try to find a boundary in table 't'. (A 'boundary' is an integer index
-** such that t[i] is present and t[i+1] is absent, or 0 if t[1] is absent
-** and 'maxinteger' if t[maxinteger] is present.)
-** (In the next explanation, we use Lua indices, that is, with base 1.
-** The code itself uses base 0 when indexing the array part of the table.)
+** Try to find a boundary in table 't'. (0-based: a 'boundary' is a
+** count 'n' such that t[n-1] is present and t[n] is absent, or 0 if t[0]
+** is absent and 'maxinteger' if t[maxinteger-1] is present.)
+** (In the next explanation, an index 'i' stands for key 'i-1', which
+** lives in 'array[i-1]'; so the code below is the same as with base 1.)
 ** The code starts with 'limit = t->alimit', a position in the array
 ** part that may be a boundary.
 **
 ** (1) If 't[limit]' is empty, there must be a boundary before it.
-** As a common case (e.g., after 't[#t]=nil'), check whether 'limit-1'
+** As a common case (e.g., after 't[#t-1]=nil'), check whether 'limit-1'
 ** is present. If so, it is a boundary. Otherwise, do a binary search
 ** between 0 and limit to find a boundary. In both cases, try to
 ** use this boundary as the new 'alimit', as a hint for the next call.
@@ -976,8 +977,8 @@ lua_Unsigned luaH_getn (Table *t) {
   /* (3) 'limit' is the last element and either is zero or present in table */
   lua_assert(limit == luaH_realasize(t) &&
              (limit == 0 || !isempty(&t->array[limit - 1])));
-  if (isdummy(t) || isempty(luaH_getint(t, cast(lua_Integer, limit + 1))))
-    return limit;  /* 'limit + 1' is absent */
+  if (isdummy(t) || isempty(luaH_getint(t, cast(lua_Integer, limit))))
+    return limit;  /* 0-based: 'limit + 1' (key 'limit') is absent */
   else  /* 'limit + 1' is also present */
     return hash_search(t, limit);
 }

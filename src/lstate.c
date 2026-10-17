@@ -222,11 +222,14 @@ static void init_registry (lua_State *L, global_State *g) {
   /* create registry */
   Table *registry = luaH_new(L);
   sethvalue(L, &g->l_registry, registry);
-  luaH_resize(L, registry, LUA_RIDX_LAST, 0);
+  luaH_resize(L, registry, LUA_RIDX_LAST + 1, 0);  /* 0-based */
+  /* 0-based: registry[0] = 0, the empty 'luaL_ref' free list; it also
+     keeps keys 0..LUA_RIDX_LAST dense, so they stay in the array part */
+  setivalue(&registry->array[0], 0);
   /* registry[LUA_RIDX_MAINTHREAD] = L */
-  setthvalue(L, &registry->array[LUA_RIDX_MAINTHREAD - 1], L);
+  setthvalue(L, &registry->array[LUA_RIDX_MAINTHREAD], L);  /* 0-based */
   /* registry[LUA_RIDX_GLOBALS] = new table (table of globals) */
-  sethvalue(L, &registry->array[LUA_RIDX_GLOBALS - 1], luaH_new(L));
+  sethvalue(L, &registry->array[LUA_RIDX_GLOBALS], luaH_new(L));  /* 0-based */
 }
 
 

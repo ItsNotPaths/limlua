@@ -298,7 +298,7 @@ OP_TFORPREP,/*	A Bx	create upvalue for R[A + 3]; pc+=Bx		*/
 OP_TFORCALL,/*	A C	R[A+4], ... ,R[A+3+C] := R[A](R[A+1], R[A+2]);	*/
 OP_TFORLOOP,/*	A Bx	if R[A+2] ~= nil then { R[A]=R[A+2]; pc -= Bx }	*/
 
-OP_SETLIST,/*	A B C k	R[A][C+i] := R[A+i], 1 <= i <= B		*/
+OP_SETLIST,/*	A B C k	R[A][C+i-1] := R[A+i], 1 <= i <= B (0-based)	*/
 
 OP_CLOSURE,/*	A Bx	R[A] := closure(KPROTO[Bx])			*/
 

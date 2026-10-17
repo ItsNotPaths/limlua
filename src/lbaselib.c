@@ -308,14 +308,14 @@ static int ipairsaux (lua_State *L) {
 
 
 /*
-** 'ipairs' function. Returns 'ipairsaux', given "table", 0.
+** 'ipairs' function. Returns 'ipairsaux', given "table", -1. (0-based)
 ** (The given "table" may not be a table.)
 */
 static int luaB_ipairs (lua_State *L) {
   luaL_checkany(L, 1);
   lua_pushcfunction(L, ipairsaux);  /* iteration function */
   lua_pushvalue(L, 1);  /* state */
-  lua_pushinteger(L, 0);  /* initial value */
+  lua_pushinteger(L, -1);  /* 0-based: initial value */
   return 3;
 }
 
