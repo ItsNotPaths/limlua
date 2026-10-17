@@ -1,1 +1,5 @@
 main.md
+*.o
+*.a
+src/lua
+src/luac
