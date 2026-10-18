@@ -42,8 +42,9 @@ static const char *const luaX_tokens [] = {
     "end", "false", "for", "function", "goto", "if",
     "in", "local", "nil", "not", "or", "repeat",
     "return", "then", "true", "until", "while",
-    "//", "..", "...", "==", ">=", "<=", "!=",
+    "..", "...", "==", ">=", "<=", "!=",
     "+=", "-=", "*=", "/=", "%=", "..=",  /* compound */
+    "++", "--",
     "<<", ">>", "::", "<eof>",
     "<number>", "<integer>", "<name>", "<string>"
 };
@@ -458,52 +459,43 @@ static l_noret length_gone (LexState *ls) {
 }
 
 
-/* C's 'x++' and 'x--'; 'x--' would silently start a comment */
-static l_noret step_error (LexState *ls, const char *op, const char *fix) {
-  const char *x = ls->t.token == TK_NAME ? getstr(ls->t.seminfo.ts) : "x";
-  lexerror(ls, luaO_pushfstring(ls->L,
-      "lim has no '%s'%s; use '%s %s 1'", op, fix, x, op[0] == '+' ? "+=" : "-="), 0);
+/* nested like odin, so commenting out code that has comments works */
+static void skip_block_comment (LexState *ls) {
+  int line = ls->linenumber;
+  int depth = 1;
+  next(ls);  /* skip '*' */
+  while (depth > 0) {
+    switch (ls->current) {
+      case EOZ:
+        lexerror(ls, luaO_pushfstring(ls->L,
+            "unfinished '/*' comment (opened at line %d)", line), TK_EOS);
+        break;  /* to avoid warnings */
+      case '\n': case '\r': inclinenumber(ls); break;
+      case '*': next(ls); if (check_next1(ls, '/')) depth--; break;
+      case '/': next(ls); if (check_next1(ls, '*')) depth++; break;
+      default: next(ls);
+    }
+  }
 }
 
 
 static int llex (LexState *ls, SemInfo *seminfo) {
-  int glued = 1;  /* no space since the previous token */
   luaZ_resetbuffer(ls->buff);
   for (;;) {
     switch (ls->current) {
       case '\n': case '\r': {  /* line breaks */
-        glued = 0;
         inclinenumber(ls);
         break;
       }
       case ' ': case '\f': case '\t': case '\v': {  /* spaces */
-        glued = 0;
         next(ls);
         break;
       }
-      case '-': {  /* '-', '-=' or '--' (comment) */
+      case '-': {  /* '-', '-=' or '--' */
         next(ls);
-        if (check_next1(ls, '=')) return TK_SUBEQ;  /* compound */
-        if (ls->current != '-') return '-';
-        /* else is a comment */
-        next(ls);
-        if (glued && ls->t.token == TK_NAME &&
-            (lisspace(ls->current) || ls->current == EOZ ||
-             ls->current == '{' || ls->current == ';' || ls->current == ')'))
-          step_error(ls, "--", " ('--' starts a comment)");
-        if (ls->current == '[') {  /* long comment? */
-          size_t sep = skip_sep(ls);
-          luaZ_resetbuffer(ls->buff);  /* 'skip_sep' may dirty the buffer */
-          if (sep >= 2) {
-            read_long_string(ls, NULL, sep);  /* skip long comment */
-            luaZ_resetbuffer(ls->buff);  /* previous call may dirty the buff. */
-            break;
-          }
-        }
-        /* else short comment */
-        while (!currIsNewline(ls) && ls->current != EOZ)
-          next(ls);  /* skip until end of line (or end of file) */
-        break;
+        if (check_next1(ls, '=')) return TK_SUBEQ;
+        if (check_next1(ls, '-')) return TK_DEC;
+        return '-';
       }
       case '#': {
         next(ls);
@@ -542,11 +534,17 @@ static int llex (LexState *ls, SemInfo *seminfo) {
           lexerror(ls, "'~=' is not an operator; use '!=' for not-equal", 0);
         return '~';
       }
-      case '/': {
+      case '/': {  /* '/', '/=', or a line or block comment */
         next(ls);
-        if (check_next1(ls, '/')) return TK_IDIV;  /* '//' */
-        else if (check_next1(ls, '=')) return TK_DIVEQ;  /* compound: '/=' */
-        else return '/';
+        if (check_next1(ls, '=')) return TK_DIVEQ;
+        if (ls->current == '*') {
+          skip_block_comment(ls);
+          break;
+        }
+        if (ls->current != '/') return '/';
+        while (!currIsNewline(ls) && ls->current != EOZ)
+          next(ls);  /* skip until end of line (or end of file) */
+        break;
       }
       case ':': {
         next(ls);
@@ -570,7 +568,7 @@ static int llex (LexState *ls, SemInfo *seminfo) {
       }
       case '+': {  /* compound: '+' or '+=' */
         next(ls);
-        if (ls->current == '+') step_error(ls, "++", "");
+        if (check_next1(ls, '+')) return TK_INC;
         return check_next1(ls, '=') ? TK_ADDEQ : '+';
       }
       case '*': {  /* compound: '*' or '*=' */

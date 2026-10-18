@@ -1,4 +1,4 @@
--- '#' is not an operator. its error names len() and rawlen()
+// '#' is not an operator. its error names len() and rawlen()
 
 local function err(src) {
   local f, msg = load(src, "=src")
@@ -19,6 +19,6 @@ local function has(s, part) { return string.find(s, part, 0, true) != nil }
 
 {
   assert(load("return '#x', \"#\"")() == "#x", "'#' in strings is text")
-  assert(load("-- #t\nreturn 1")() == 1, "'#' in comments is text")
+  assert(load("// #t\nreturn 1")() == 1, "'#' in comments is text")
   assert(select("#", 1, 2) == 2, "select('#') still works")
 }

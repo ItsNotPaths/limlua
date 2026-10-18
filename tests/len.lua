@@ -1,4 +1,4 @@
--- len(): every non-nil entry of a table, or the bytes of a string
+// len(): every non-nil entry of a table, or the bytes of a string
 
 {
   assert(len({}) == 0, "empty")

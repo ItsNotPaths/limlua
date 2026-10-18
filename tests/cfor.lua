@@ -1,4 +1,4 @@
--- c-style for: for i = 0; cond; step { }
+// c-style for: for i = 0; cond; step { }
 
 local function err(src) {
   local f, msg = load(src, "=src")
@@ -14,10 +14,10 @@ local function collect(f) {
   return table.concat(out, " ")
 }
 
--- the basic loop, and each part being optional
+// the basic loop, and each part being optional
 {
   assert(collect(function(put) { for i = 0; i < 5; i += 1 { put(i) } }) == "0 1 2 3 4", "counts up")
-  assert(collect(function(put) { for i = 10; i > 0; i = i // 2 { put(i) } }) == "10 5 2 1", "any step")
+  assert(collect(function(put) { for i = 10; i > 0; i = math.floor(i / 2) { put(i) } }) == "10 5 2 1", "any step")
   assert(collect(function(put) { for i = 0; i < 0; i += 1 { put(i) } }) == "", "false at the start runs nothing")
   local n = 0
   for i = 0; ; i += 1 { n = i; if i == 7 { break } }
@@ -31,7 +31,7 @@ local function collect(f) {
   assert(t[1] && t[2] && t[3], "step may write a table")
 }
 
--- the variable
+// the variable
 {
   local fs = {}
   for i = 0; i < 3; i += 1 { fs[i] = function() { return i } }
@@ -45,7 +45,7 @@ local function collect(f) {
   assert(i == "outer", "i is scoped to the loop")
 }
 
--- steps of any shape run after the body
+// steps of any shape run after the body
 {
   assert(collect(function(put) { for i = 0; i < 9; i = i < 4 && i + 1 || i + 2 { put(i) } }) == "0 1 2 3 4 6 8",
          "step with and/or")
@@ -60,7 +60,7 @@ local function collect(f) {
   assert(!ok && has(msg, "src:2:"), "step errors report the step's line: " .. tostring(msg))
 }
 
--- jumps
+// jumps
 {
   assert(collect(function(put) { for i = 0; i < 10; i += 1 { if i % 3 != 0 { continue } put(i) } }) == "0 3 6 9",
          "continue runs the step")
@@ -75,25 +75,34 @@ local function collect(f) {
   assert(closed == 3, "<close> runs on continue")
 }
 
--- numeric for is unchanged
+// numeric for is unchanged
 {
   assert(collect(function(put) { for i = 0, 2 { put(i) } }) == "0 1 2", "numeric for")
 }
 
--- errors for C habits
+// '++' and '--' are for steps only
+{
+  assert(collect(function(put) { for i = 0; i < 3; i++ { put(i) } }) == "0 1 2", "i++")
+  assert(collect(function(put) { for i = 2; i >= 0; i-- { put(i) } }) == "2 1 0", "i--")
+  local t = {n = 0}
+  for i = 0; i < 2; t.n++ { i += 1 }
+  assert(t.n == 2, "a field as the step target")
+  local plus = "'++' only works as a for loop's step; use 'x += 1'"
+  local minus = "lim comments are '//', not '--'; 'x--' only works as a for loop's step"
+  for _, src in ipairs({"x = 1\nx++", "print(a[i++])", "local y = x++", "++x",
+                        "for i = 0; i < 1; f(function() { x++ }) { }"}) {
+    assert(has(err(src), plus), src)
+  }
+  for _, src in ipairs({"x--", "--x", "-- a lua comment", "x = 1 -- trailing", "local y = x--\n", "print(5--3)"}) {
+    assert(has(err(src), minus), src)
+  }
+  assert(has(err("x = 1\nx++"), "src:2:"), "at the line of the '++'")
+}
+
+// errors for C habits
 {
   assert(has(err("for (i = 0; i < 3; i += 1) { }"), "lim's for has no parentheses"), "for (")
-  assert(has(err("for i = 0; i < 3; i++ { }"), "lim has no '++'; use 'i += 1'"), "i++")
-  local msg = err("for i = 9; i >= 0; i-- {\n  print(i)\n}")
-  assert(has(msg, "src:1:") && has(msg, "'--' starts a comment); use 'i -= 1'"), "i-- at its line: " .. msg)
   assert(has(err("for i = 0 { }"), "',' (numeric for) or ';' (c-style for) expected"), "neither , nor ;")
   assert(has(err("for i = 0; i < 3 { }"), "';' expected: for i = 0; cond; step { }"), "missing second ;")
   assert(has(err("for i = 0; i < 3; local z = 1 { }"), "the step of a for is an assignment or a call"), "bad step")
-}
-
--- '--' after a name with no space is only an error when it reads as a decrement
-{
-  assert(load("x = 1 -- note") != nil, "spaced comment")
-  assert(load("x = y--note") != nil, "comment glued on both sides")
-  assert(load("x = y--[[ c ]]") != nil, "long comment")
 }

@@ -1,4 +1,4 @@
--- continue, and named loops/blocks with 'break name' / 'continue name'
+// continue, and named loops/blocks with 'break name' / 'continue name'
 
 local function err(src) {
   local f, msg = load(src, "=src")
@@ -8,7 +8,7 @@ local function err(src) {
 
 local function has(s, part) { return string.find(s, part, 0, true) != nil }
 
--- continue in every loop kind
+// continue in every loop kind
 {
   local odd = {}
   for i = 0, 9 { if i % 2 == 0 { continue } odd[len(odd)] = i }
@@ -24,7 +24,7 @@ local function has(s, part) { return string.find(s, part, 0, true) != nil }
   assert(seen == 1, "repeat: continue still checks 'until'")
 }
 
--- named loops
+// named loops
 {
   local out = {}
   outer: for i = 0, 3 {
@@ -43,7 +43,7 @@ local function has(s, part) { return string.find(s, part, 0, true) != nil }
   assert(inner == 6, "plain continue targets the innermost loop")
 }
 
--- named blocks
+// named blocks
 {
   local reached = false
   blk: {
@@ -56,7 +56,7 @@ local function has(s, part) { return string.find(s, part, 0, true) != nil }
   assert(after == 2, "break a block inside a loop keeps looping")
 }
 
--- jumps close upvalues and <close> variables
+// jumps close upvalues and <close> variables
 {
   local fs = {}
   for i = 0, 2 { local v = i * 10; fs[i] = function() { return v } if i == 1 { continue } }
@@ -69,7 +69,7 @@ local function has(s, part) { return string.find(s, part, 0, true) != nil }
   assert(closed == 4, "<close> runs on break outer")
 }
 
--- 'name:' only labels a loop or block; 'obj:m()' is still a call
+// 'name:' only labels a loop or block; 'obj:m()' is still a call
 {
   local t = {v = 0}
   function t:bump() { self.v += 1 }
@@ -81,13 +81,13 @@ local function has(s, part) { return string.find(s, part, 0, true) != nil }
   assert(x == 1, "break, then a block")
 }
 
--- a name only counts on the same line as break / continue
+// a name only counts on the same line as break / continue
 {
   local f = load("local n = 0\nfor i = 0, 1 { n += 1; if true { break }\nn += 10 }\nreturn n")
   assert(f() == 1, "break alone on its line")
 }
 
--- errors
+// errors
 {
   assert(has(err("x = 1\ncontinue\n\ny = 2"), "src:2: 'continue' outside a loop"), "continue outside, at its line")
   assert(has(err("if x { break }"), "'break' outside a loop"), "break outside (fast path)")

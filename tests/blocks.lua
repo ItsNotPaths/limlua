@@ -1,4 +1,4 @@
--- '{ }' blocks for if / while / for / repeat / function / bare scope; calls need '( )'
+// '{ }' blocks for if / while / for / repeat / function / bare scope; calls need '( )'
 
 local function err(src) {
   local f, msg = load(src, "=src")
@@ -8,7 +8,7 @@ local function err(src) {
 
 local function has(s, part) { return string.find(s, part, 0, true) != nil }
 
--- if chains: 'else if' and 'elseif' both work
+// if chains: 'else if' and 'elseif' both work
 {
   local function sign(x) {
     if x < 0 { return "neg" } elseif x == 0 { return "zero" } else if x < 10 { return "small" } else { return "big" }
@@ -23,7 +23,7 @@ local function has(s, part) { return string.find(s, part, 0, true) != nil }
   assert(r == 2, "table constructor in a condition")
 }
 
--- loops
+// loops
 {
   local n = 0
   while n < 3 { n += 1 }
@@ -38,7 +38,7 @@ local function has(s, part) { return string.find(s, part, 0, true) != nil }
   assert(keys == 2, "generic for")
 }
 
--- break, including the 'if c { break }' fast path
+// break, including the 'if c { break }' fast path
 {
   local last
   for i = 0, 9 { if i == 3 { break } last = i }
@@ -51,7 +51,7 @@ local function has(s, part) { return string.find(s, part, 0, true) != nil }
   assert(hits == 3, "break in while")
 }
 
--- functions and scopes
+// functions and scopes
 {
   local t = {v = 2}
   function t.get() { return t.v }
@@ -71,7 +71,7 @@ local function has(s, part) { return string.find(s, part, 0, true) != nil }
   assert(x == 2, "call, then a block on the next line")
 }
 
--- old lua block syntax names the lim form
+// old lua block syntax names the lim form
 {
   for _, src in ipairs({"if x then y = 1 end", "while x do end", "for i = 0, 1 do end",
                         "do local a = 1 end", "function f() end", "if x {\n y = 1\nend"}) {
@@ -83,7 +83,7 @@ local function has(s, part) { return string.find(s, part, 0, true) != nil }
   assert(has(err("x = 1 }"), "'}' without a matching '{'"), "stray '}'")
 }
 
--- call sugar is gone
+// call sugar is gone
 {
   for _, src in ipairs({"print {1}", "obj:m {1}"}) {
     assert(has(err(src), "f({...})"), src)

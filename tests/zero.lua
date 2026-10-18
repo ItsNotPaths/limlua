@@ -1,4 +1,4 @@
--- 0-based Lua fork: every sequence/string position starts at 0.
+// 0-based Lua fork: every sequence/string position starts at 0.
 
 local function isborder(t, n) {
   if n == 0 { return rawget(t, 0) == nil }
@@ -23,7 +23,7 @@ local function errs(pat, f, ...) {
   return not ok and string.find(tostring(msg), pat, 0, true) != nil
 }
 
--- empty table and key 0
+// empty table and key 0
 {
   local t = {}
   assert(rawlen(t) == 0, "empty len")
@@ -37,7 +37,7 @@ local function errs(pat, f, ...) {
   assert(rawlen(t) == 0 or rawlen(t) == 2, "len after removing key 0")
 }
 
--- constructors
+// constructors
 {
   local t = {10, 20, 30}
   assert(t[0] == 10 and t[1] == 20 and t[2] == 30, "constructor keys")
@@ -62,7 +62,7 @@ local function errs(pat, f, ...) {
   assert(mixed.x == 3 and mixed[10] == 4, "mixed hash")
   assert(rawlen(mixed) == 3, "mixed len")
 
-  -- more items than one SETLIST flush (50), with and without multret tail
+  // more items than one SETLIST flush (50), with and without multret tail
   local parts = {}
   for i = 0, 299 { parts[rawlen(parts)] = tostring(i) }
   local big = load("return {" .. table.concat(parts, ",") .. "}")()
@@ -72,7 +72,7 @@ local function errs(pat, f, ...) {
   assert(rawlen(bigm) == 303 and bigm[299] == 299 and bigm[300] == "x" and bigm[302] == "z", "big constructor multret")
 }
 
--- holes, negative keys, float keys
+// holes, negative keys, float keys
 {
   local t = {1, nil, 3}
   assert(isborder(t, rawlen(t)), "hole border")
@@ -95,7 +95,7 @@ local function errs(pat, f, ...) {
   assert(t[2 ^ 53] == nil, "huge float absent")
 }
 
--- growth far past the array part, shrink, regrow
+// growth far past the array part, shrink, regrow
 {
   local t = {}
   for i = 0, 10000 { t[i] = i * 2 }
@@ -105,12 +105,12 @@ local function errs(pat, f, ...) {
 
   for i = 10, 10000 { t[i] = nil }
   assert(rawlen(t) == 10, "shrunk len")
-  for i = 0, 200 { t["s" .. i] = i }  -- force rehash
+  for i = 0, 200 { t["s" .. i] = i }  // force rehash
   assert(rawlen(t) == 10, "shrunk len after rehash")
   for i = 0, 9 { assert(t[i] == i * 2, "survivor " .. i) }
   assert(t[10] == nil and t[5000] == nil, "removed stay removed")
 
-  for i = 10000, 0, -1 { t[i] = -i }  -- reinsert from the top down
+  for i = 10000, 0, -1 { t[i] = -i }  // reinsert from the top down
   assert(rawlen(t) == 10001, "regrown len")
   for i = 0, 10000 { assert(t[i] == -i, "regrown key") }
 
@@ -119,7 +119,7 @@ local function errs(pat, f, ...) {
   for i = 1, 10000, 2 { assert(t[i] == -i, "odd kept") }
 }
 
--- integer keys in the hash part only (exercises hash_search)
+// integer keys in the hash part only (exercises hash_search)
 {
   local t = {}
   for i = 1, 16 { t["k" .. i] = i }
@@ -133,10 +133,10 @@ local function errs(pat, f, ...) {
   assert(isborder(u, rawlen(u)), "maxinteger key border")
 }
 
--- keys 0 and 2^k - 1 only in the hash part (hash_search up to maxinteger)
+// keys 0 and 2^k - 1 only in the hash part (hash_search up to maxinteger)
 {
   local t = {}
-  for i = 1, 129 { t["h" .. i] = i }  -- 256 nodes, 127 still free
+  for i = 1, 129 { t["h" .. i] = i }  // 256 nodes, 127 still free
   t[0] = 0
   for k = 1, 62 { t[(1 << k) - 1] = k }
   t[math.maxinteger - 1] = "top"
@@ -146,10 +146,10 @@ local function errs(pat, f, ...) {
   assert(rawlen(t) >= 1 << 62, "hash_search border past 2^62")
 }
 
--- __len is still used by table.*
+// __len is still used by table.*
 assert(select("#", table.unpack(setmetatable({}, {__len = function() { return 2 }}))) == 2, "__len")
 
--- next / pairs visit each key once
+// next / pairs visit each key once
 {
   local t = {}
   for i = -3, 40 { t[i] = i }
@@ -168,11 +168,11 @@ assert(select("#", table.unpack(setmetatable({}, {__len = function() { return 2 
   assert(next({5, 6}, 0) == 1, "next after 0")
   assert(next({5, 6}, 1) == nil, "next after last")
   assert(errs("invalid key to 'next'", next, {5, 6}, 7), "next bad key")
-  for key in pairs(t) { t[key] = nil }  -- clearing during traversal is allowed
+  for key in pairs(t) { t[key] = nil }  // clearing during traversal is allowed
   assert(next(t) == nil, "cleared during pairs")
 }
 
--- ipairs
+// ipairs
 {
   local got = {}
   for i, v in ipairs({"a", "b", "c", nil, "e"}) { got[rawlen(got)] = i .. v }
@@ -190,7 +190,7 @@ assert(select("#", table.unpack(setmetatable({}, {__len = function() { return 2 
   assert(rawlen(got) == 3 and got[0] == 0 and got[2] == 20, "ipairs __index")
 }
 
--- table.insert
+// table.insert
 {
   local t = {}
   table.insert(t, "a")
@@ -211,7 +211,7 @@ assert(select("#", table.unpack(setmetatable({}, {__len = function() { return 2 
   assert(same(e, {"only"}), "insert 0 into empty")
 }
 
--- table.remove
+// table.remove
 {
   local t = {"a", "b", "c", "d"}
   assert(table.remove(t) == "d" and same(t, {"a", "b", "c"}), "remove last")
@@ -228,7 +228,7 @@ assert(select("#", table.unpack(setmetatable({}, {__len = function() { return 2 
   assert(table.remove(n) == "neg" and n[-1] == nil, "remove on empty touches t[rawlen(t)-1]")
 }
 
--- table.move
+// table.move
 {
   local a = {1, 2, 3}
   table.move(a, 0, 2, 1)
@@ -244,7 +244,7 @@ assert(select("#", table.unpack(setmetatable({}, {__len = function() { return 2 
   assert(d[5] == 2 and d[6] == 3 and d[0] == nil, "move offsets")
 }
 
--- table.concat
+// table.concat
 {
   local t = {1, 2, 3}
   assert(table.concat(t) == "123", "concat default")
@@ -257,7 +257,7 @@ assert(select("#", table.unpack(setmetatable({}, {__len = function() { return 2 
   assert(errs("at index 3", table.concat, t, ",", 0, 3), "concat reports key")
 }
 
--- table.pack / table.unpack
+// table.pack / table.unpack
 {
   local p = table.pack(1, nil, 3)
   assert(p[0] == 1 and p[1] == nil and p[2] == 3 and p.n == 3, "pack")
@@ -277,7 +277,7 @@ assert(select("#", table.unpack(setmetatable({}, {__len = function() { return 2 
   assert(a == "n" and b == "z", "unpack negative")
 }
 
--- table.sort
+// table.sort
 {
   local t = {3, 1, 2}
   table.sort(t)
@@ -299,7 +299,7 @@ assert(select("#", table.unpack(setmetatable({}, {__len = function() { return 2 
   for i = 1, 999 { assert(r[i - 1] <= r[i], "sort big order") }
 }
 
--- string.sub
+// string.sub
 {
   local s = "hello"
   assert(s:sub(0, 0) == "h", "sub first char")
@@ -317,7 +317,7 @@ assert(select("#", table.unpack(setmetatable({}, {__len = function() { return 2 
   assert((""):sub(0) == "", "sub empty string")
 }
 
--- string.byte
+// string.byte
 {
   local s = "abc"
   assert(s:byte() == 97, "byte default")
@@ -330,7 +330,7 @@ assert(select("#", table.unpack(setmetatable({}, {__len = function() { return 2 
   assert(select("#", s:byte(-10, 0)) == 1, "byte clamped start")
 }
 
--- string.find / match / gmatch / gsub
+// string.find / match / gmatch / gsub
 {
   local s = "hello"
   local i, j = s:find("ll")
@@ -380,7 +380,7 @@ assert(select("#", table.unpack(setmetatable({}, {__len = function() { return 2 
   assert(select(2, ("aaa"):gsub("a", "b", 2)) == 2, "gsub max count")
 }
 
--- string.pack / string.unpack positions
+// string.pack / string.unpack positions
 {
   local data = string.pack("i1i1i1", 1, 2, 3)
   local a, b, c, nxt = string.unpack("i1i1i1", data)
@@ -399,9 +399,9 @@ assert(select("#", table.unpack(setmetatable({}, {__len = function() { return 2 
   assert(string.packsize("i4") == 4 and len(data) == 3, "sizes unchanged")
 }
 
--- utf8
+// utf8
 {
-  local s = "a\u{3B1}b\u{10348}"  -- bytes: a(0) α(1,2) b(3) 𐍈(4..7)
+  local s = "a\u{3B1}b\u{10348}"  // bytes: a(0) α(1,2) b(3) 𐍈(4..7)
   assert(len(s) == 8, "utf8 fixture")
   assert(utf8.len(s) == 4, "utf8.len")
   assert(utf8.len(s, 1) == 3, "utf8.len i")
@@ -456,7 +456,7 @@ assert(select("#", table.unpack(setmetatable({}, {__len = function() { return 2 
   assert(utf8.char(72, 105) == "Hi", "utf8.char unchanged")
 }
 
--- math.random
+// math.random
 {
   math.randomseed(1234)
   local seen = {}
@@ -486,7 +486,7 @@ assert(select("#", table.unpack(setmetatable({}, {__len = function() { return 2 
   assert(math.type(f) == "float" and f >= 0 and f < 1, "random() float")
 }
 
--- unchanged ordinals and counts
+// unchanged ordinals and counts
 {
   assert(select(1, "a", "b") == "a" and select(-1, "a", "b") == "b", "select ordinals")
   assert(select("#", "a", nil) == 2, "select #")
@@ -496,7 +496,7 @@ assert(select("#", table.unpack(setmetatable({}, {__len = function() { return 2 
   assert(debug.getinfo(1, "l").currentline > 0, "debug level 1")
 }
 
--- registry layout and package.searchers
+// registry layout and package.searchers
 {
   local reg = debug.getregistry()
   assert(type(reg[1]) == "thread", "registry[LUA_RIDX_MAINTHREAD]")
@@ -519,7 +519,7 @@ assert(select("#", table.unpack(setmetatable({}, {__len = function() { return 2 
   table.remove(package.searchers)
 }
 
--- randomized stress: integer keys against a string-keyed model
+// randomized stress: integer keys against a string-keyed model
 {
   math.randomseed(20260922)
   local t, model = {}, {}
@@ -546,15 +546,15 @@ assert(select("#", table.unpack(setmetatable({}, {__len = function() { return 2 
   for step = 1, 6000 {
     local k = math.random(LO, HI)
     local r = math.random(0, 9)
-    if step % 1500 < 400 { k = math.random(0, 64) }  -- phases dense near 0
+    if step % 1500 < 400 { k = math.random(0, 64) }  // phases dense near 0
     if r < 3 {
       t[k], model[tostring(k)] = nil, nil
     } elseif r == 3 {
-      t[k + 0.0], model[tostring(k)] = step, step  -- float key with integer value
+      t[k + 0.0], model[tostring(k)] = step, step  // float key with integer value
     } else {
       t[k], model[tostring(k)] = step, step
     }
-    if step % 777 == 0 {  -- bulk clear to force shrinking rehashes
+    if step % 777 == 0 {  // bulk clear to force shrinking rehashes
       for key = LO, HI {
         if math.random(0, 1) == 0 { t[key], model[tostring(key)] = nil, nil }
       }
@@ -566,7 +566,7 @@ assert(select("#", table.unpack(setmetatable({}, {__len = function() { return 2 
   check_pairs(-1)
 }
 
--- randomized stress: table.insert/remove against a string-keyed list model
+// randomized stress: table.insert/remove against a string-keyed list model
 {
   math.randomseed(99)
   local t, m, mn = {}, {}, 0

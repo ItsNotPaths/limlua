@@ -64,7 +64,7 @@ typedef struct BlockCnt {
 */
 static void statement (LexState *ls);
 static void expr (LexState *ls, expdesc *v);
-static void exprstat (LexState *ls, TString *name);
+static void exprstat (LexState *ls, TString *name, int isstep);
 
 
 static l_noret error_expected (LexState *ls, int token) {
@@ -816,6 +816,14 @@ static l_noret luablock_error (LexState *ls) {
 }
 
 
+/* '++' / '--' anywhere but a for step; '--' is most likely a lua comment */
+static l_noret stepop_error (LexState *ls) {
+  luaX_syntaxerror(ls, ls->t.token == TK_INC
+      ? "'++' only works as a for loop's step; use 'x += 1'"
+      : "lim comments are '//', not '--'; 'x--' only works as a for loop's step");
+}
+
+
 static void openblock (LexState *ls) {
   if (ls->t.token == TK_THEN || ls->t.token == TK_DO || ls->t.token == TK_END)
     luablock_error(ls);
@@ -1245,7 +1253,6 @@ static BinOpr getbinopr (int op) {
     case '%': return OPR_MOD;
     case '^': return OPR_POW;
     case '/': return OPR_DIV;
-    case TK_IDIV: return OPR_IDIV;
     case '&': return OPR_BAND;
     case '|': return OPR_BOR;
     case '~': return OPR_BXOR;
@@ -1303,6 +1310,8 @@ static BinOpr subexpr (LexState *ls, expdesc *v, int limit) {
     luaK_prefix(ls->fs, uop, v, line);
   }
   else simpleexp(ls, v);
+  if (ls->t.token == TK_INC || ls->t.token == TK_DEC)  /* 'a[i++]', 'x = y -- c' */
+    stepop_error(ls);
   /* expand while operators have priorities higher than 'limit' */
   op = getbinopr(ls->t.token);
   while (op != OPR_NOBINOPR && priority[op].left > limit) {
@@ -1445,16 +1454,20 @@ static BinOpr compoundopr (int token) {  /* compound */
     case TK_DIVEQ: return OPR_DIV;
     case TK_MODEQ: return OPR_MOD;
     case TK_CATEQ: return OPR_CONCAT;
+    case TK_INC: return OPR_ADD;
+    case TK_DEC: return OPR_SUB;
     default: return OPR_NOBINOPR;
   }
 }
 
 
-/* compound: 'v op= e' is 'v = v op (e)'; 'v' was read once by the caller */
+/* compound: 'v op= e' is 'v = v op (e)', and 'v++' is 'v = v + 1';
+   'v' was read once by the caller */
 static void compoundassign (LexState *ls, expdesc *v, BinOpr op) {
   FuncState *fs = ls->fs;
   int top = fs->freereg;
   int line = ls->linenumber;
+  int isstep = (ls->t.token == TK_INC || ls->t.token == TK_DEC);
   expdesc e1 = *v, e2;
   check_condition(ls, vkisvar(v->k), "syntax error");
   check_readonly(ls, v);
@@ -1462,7 +1475,12 @@ static void compoundassign (LexState *ls, expdesc *v, BinOpr op) {
   luaK_dischargevars(fs, &e1);
   fs->freereg = top;  /* keep the target's table and key for the store */
   luaK_infix(fs, op, &e1);
-  expr(ls, &e2);
+  if (isstep) {
+    init_exp(&e2, VKINT, 0);
+    e2.u.ival = 1;
+  }
+  else
+    expr(ls, &e2);
   luaK_posfix(fs, op, &e1, &e2, line);
   luaK_storevar(fs, v, &e1);
 }
@@ -1756,7 +1774,7 @@ static void forc (LexState *ls, TString *varname, int base, int line) {
   if (ls->t.token != '{') {
     if (ls->t.token != TK_NAME && ls->t.token != '(')
       luaX_syntaxerror(ls, "the step of a for is an assignment or a call, like 'i += 1'");
-    exprstat(ls, NULL);
+    exprstat(ls, NULL, 1);
     fs->freereg = luaY_nvarstack(fs);
   }
   for (pc = stepfirst; pc < fs->pc; pc++) {  /* save the step... */
@@ -1978,9 +1996,10 @@ static void funcstat (LexState *ls, int line) {
 }
 
 
-static void exprstat (LexState *ls, TString *name) {
+static void exprstat (LexState *ls, TString *name, int isstep) {
   /* stat -> func | assignment | compoundassign */
-  /* 'name' is a leading NAME already read, or NULL */
+  /* 'name' is a leading NAME already read, or NULL; only a for step
+     ('isstep') may be 'x++' or 'x--' */
   FuncState *fs = ls->fs;
   struct LHS_assign v;
   BinOpr op;
@@ -1994,8 +2013,11 @@ static void exprstat (LexState *ls, TString *name) {
     v.prev = NULL;
     restassign(ls, &v, 1);
   }
-  else if ((op = compoundopr(ls->t.token)) != OPR_NOBINOPR)  /* compound */
+  else if ((op = compoundopr(ls->t.token)) != OPR_NOBINOPR) {  /* compound */
+    if (!isstep && (ls->t.token == TK_INC || ls->t.token == TK_DEC))
+      stepop_error(ls);
     compoundassign(ls, &v.v, op);
+  }
   else {  /* stat -> func */
     Instruction *inst;
     if (v.v.k != VCALL && ls->t.token == '{') callsugar_error(ls);
@@ -2089,6 +2111,7 @@ static void statement (LexState *ls) {
       break;
     }
     case TK_THEN: case TK_DO: case TK_END: luablock_error(ls);
+    case TK_INC: case TK_DEC: stepop_error(ls);
     case TK_FOR: {  /* stat -> forstat */
       forstat(ls, line, NULL);
       break;
@@ -2138,7 +2161,7 @@ static void statement (LexState *ls) {
           break;
         }
       }
-      exprstat(ls, name);
+      exprstat(ls, name, 0);
       break;
     }
     case TK_GOTO: {  /* stat -> 'goto' NAME */
@@ -2147,7 +2170,7 @@ static void statement (LexState *ls) {
       break;
     }
     default: {  /* stat -> func | assignment */
-      exprstat(ls, NULL);
+      exprstat(ls, NULL, 0);
       break;
     }
   }

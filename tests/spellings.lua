@@ -1,4 +1,4 @@
--- spellings: ! != && ||. != is gone, not/and/or stay
+// spellings: ! != && ||. != is gone, not/and/or stay
 
 local function syntax_err(src, near) {
   local f, msg = load(src)
@@ -7,7 +7,7 @@ local function syntax_err(src, near) {
 }
 
 
--- Papyrus spellings
+// Papyrus spellings
 {
   local t, f = true, false
   assert((1 != 2) == true and (1 != 1) == false, "!=")
@@ -34,7 +34,7 @@ local function syntax_err(src, near) {
   assert(n == 0, "|| and && short-circuit")
 }
 
--- spelling errors and token names
+// spelling errors and token names
 {
   assert(syntax_err("x = a | |b"), "| |")
   assert(syntax_err("x = a & &b"), "& &")

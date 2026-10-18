@@ -1,4 +1,4 @@
--- compound assignment: += -= *= /= %= ..=
+// compound assignment: += -= *= /= %= ..=
 
 local function syntax_err(src, near) {
   local f, msg = load(src)
@@ -6,7 +6,7 @@ local function syntax_err(src, near) {
   return near == nil or string.find(msg, near, 0, true) != nil
 }
 
--- every operator on a local
+// every operator on a local
 {
   local x = 10
   x += 5;   assert(x == 15, "+=")
@@ -20,7 +20,7 @@ local function syntax_err(src, near) {
   i /= 1;   assert(math.type(i) == "float", "/= is float division")
 }
 
--- upvalues
+// upvalues
 {
   local n, s = 1, "a"
   local function bump() {
@@ -31,7 +31,7 @@ local function syntax_err(src, near) {
   assert(n == 15 / 3 % 4 and s == "ab", "upvalue targets")
 }
 
--- globals
+// globals
 {
   G_OPS = 2
   G_OPS += 1; G_OPS *= 4; G_OPS -= 2; G_OPS /= 5; G_OPS %= 1.5
@@ -41,7 +41,7 @@ local function syntax_err(src, near) {
   G_OPS = nil
 }
 
--- fields and indexed targets
+// fields and indexed targets
 {
   local t = {n = 1, s = "x", [0] = 2, [true] = 3}
   t.n += 1; t.n *= 3; t.n -= 1; t.n /= 5; t.n %= 0.75
@@ -57,7 +57,7 @@ local function syntax_err(src, near) {
   assert(deep.a.b[0].c == 10, "nested target")
 }
 
--- table and key subexpressions run once
+// table and key subexpressions run once
 {
   local t = {k = {[5] = 10}}
   local tcalls, kcalls = 0, 0
@@ -91,7 +91,7 @@ local function syntax_err(src, near) {
   assert(u[0] == 6, "ordered result")
 }
 
--- right side is one parenthesized expression
+// right side is one parenthesized expression
 {
   local x = 2
   x *= 1 + 2;       assert(x == 6, "x * (1 + 2)")
@@ -110,7 +110,7 @@ local function syntax_err(src, near) {
   z += two();       assert(z == 6, "call truncated to one value")
 }
 
--- metamethods fire through compound forms
+// metamethods fire through compound forms
 {
   local seen = {}
   local mt = {}
@@ -137,12 +137,11 @@ local function syntax_err(src, near) {
   assert(not ok and string.find(msg, "field 'f'", 0, true), "error names the field")
 }
 
--- syntax errors
+// syntax errors
 {
   assert(syntax_err("a, b += 1", "'=' expected near '+='"), "multiple targets")
   assert(syntax_err("x +=", "<eof>"), "missing right side")
   assert(syntax_err("x += 1, 2", "','"), "right side list")
-  assert(syntax_err("x //= 2"), "no //=")
   assert(syntax_err("x ^= 2"), "no ^=")
   assert(syntax_err("f() += 1"), "call target")
   assert(syntax_err("(x) += 1"), "parenthesized target")
@@ -158,18 +157,19 @@ local function syntax_err(src, near) {
   }
 }
 
--- lexing next to existing tokens
+// lexing next to existing tokens
 {
   local x = 5
-  x -= 1 --comment
+  x -= 1 //comment
   assert(x == 4, "-= then comment")
-  x --[[ long comment ]] = 9
-  assert(x == 9, "-- still a comment")
-  x = x --= 100
-  assert(x == 9, "--= is a comment")
+  x /* block comment */ = 9
+  assert(x == 9, "block comment between tokens")
+  x /=3 // /= beside a comment
+  assert(x == 3.0, "/= then comment")
+  x = 9
   x -=-1
   assert(x == 10, "-=-")
-  assert(x - -1 == 11 and 10 // 3 == 3 and 7 % 3 == 1 and 2 * 3 == 6 and 1 / 2 == 0.5,
+  assert(x - -1 == 11 and 7 % 3 == 1 and 2 * 3 == 6 and 1 / 2 == 0.5,
          "binary operators unchanged")
   local a = 1
   a = 2
@@ -187,7 +187,7 @@ local function syntax_err(src, near) {
   y+=1 y*=3 y..="" assert(y == "6", "no spaces")
 }
 
--- bitwise operators still work
+// bitwise operators still work
 {
   assert((5 | 3) == 7 and (5 & 3) == 1 and (5 ~ 3) == 6, "| & ~")
   assert(~0 == -1 and ~~5 == 5, "unary ~")
