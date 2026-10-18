@@ -458,15 +458,26 @@ static l_noret length_gone (LexState *ls) {
 }
 
 
+/* C's 'x++' and 'x--'; 'x--' would silently start a comment */
+static l_noret step_error (LexState *ls, const char *op, const char *fix) {
+  const char *x = ls->t.token == TK_NAME ? getstr(ls->t.seminfo.ts) : "x";
+  lexerror(ls, luaO_pushfstring(ls->L,
+      "lim has no '%s'%s; use '%s %s 1'", op, fix, x, op[0] == '+' ? "+=" : "-="), 0);
+}
+
+
 static int llex (LexState *ls, SemInfo *seminfo) {
+  int glued = 1;  /* no space since the previous token */
   luaZ_resetbuffer(ls->buff);
   for (;;) {
     switch (ls->current) {
       case '\n': case '\r': {  /* line breaks */
+        glued = 0;
         inclinenumber(ls);
         break;
       }
       case ' ': case '\f': case '\t': case '\v': {  /* spaces */
+        glued = 0;
         next(ls);
         break;
       }
@@ -476,6 +487,10 @@ static int llex (LexState *ls, SemInfo *seminfo) {
         if (ls->current != '-') return '-';
         /* else is a comment */
         next(ls);
+        if (glued && ls->t.token == TK_NAME &&
+            (lisspace(ls->current) || ls->current == EOZ ||
+             ls->current == '{' || ls->current == ';' || ls->current == ')'))
+          step_error(ls, "--", " ('--' starts a comment)");
         if (ls->current == '[') {  /* long comment? */
           size_t sep = skip_sep(ls);
           luaZ_resetbuffer(ls->buff);  /* 'skip_sep' may dirty the buffer */
@@ -555,6 +570,7 @@ static int llex (LexState *ls, SemInfo *seminfo) {
       }
       case '+': {  /* compound: '+' or '+=' */
         next(ls);
+        if (ls->current == '+') step_error(ls, "++", "");
         return check_next1(ls, '=') ? TK_ADDEQ : '+';
       }
       case '*': {  /* compound: '*' or '*=' */
