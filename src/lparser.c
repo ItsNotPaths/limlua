@@ -54,6 +54,7 @@ typedef struct BlockCnt {
   lu_byte upval;  /* true if some variable in the block is an upvalue */
   lu_byte isloop;  /* true if 'block' is a loop */
   lu_byte insidetbc;  /* true if inside the scope of a to-be-closed var. */
+  TString *name;  /* 'name:' of a loop or block, or NULL */
 } BlockCnt;
 
 
@@ -460,8 +461,7 @@ static void singlevaraux (FuncState *fs, TString *n, expdesc *var, int base) {
 ** Find a variable with the given name 'n', handling global variables
 ** too.
 */
-static void singlevar (LexState *ls, expdesc *var) {
-  TString *varname = str_checkname(ls);
+static void namedvar (LexState *ls, TString *varname, expdesc *var) {
   FuncState *fs = ls->fs;
   singlevaraux(fs, varname, var, 1);
   if (var->k == VVOID) {  /* global name? */
@@ -472,6 +472,11 @@ static void singlevar (LexState *ls, expdesc *var) {
     codestring(&key, varname);  /* key is variable name */
     luaK_indexed(fs, var, &key);  /* env[varname] */
   }
+}
+
+
+static void singlevar (LexState *ls, expdesc *var) {
+  namedvar(ls, str_checkname(ls), var);
 }
 
 
@@ -514,7 +519,10 @@ static void adjust_assign (LexState *ls, int nvars, int nexps, expdesc *e) {
 static l_noret jumpscopeerror (LexState *ls, Labeldesc *gt) {
   const char *varname = getstr(getlocalvardesc(ls->fs, gt->nactvar)->vd.name);
   const char *msg = "<goto %s> at line %d jumps into the scope of local '%s'";
-  msg = luaO_pushfstring(ls->L, msg, getstr(gt->name), gt->line, varname);
+  const char *name = getstr(gt->name);
+  if (strcmp(name, "continue") == 0 || strncmp(name, "continue ", 9) == 0)
+    msg = "'%s' at line %d skips local '%s', which 'until' can still see";  /* only in 'repeat' */
+  msg = luaO_pushfstring(ls->L, msg, name, gt->line, varname);
   luaK_semerror(ls, msg);  /* raise the error */
 }
 
@@ -646,6 +654,7 @@ static void enterblock (FuncState *fs, BlockCnt *bl, lu_byte isloop) {
   bl->firstgoto = fs->ls->dyd->gt.n;
   bl->upval = 0;
   bl->insidetbc = (fs->bl != NULL && fs->bl->insidetbc);
+  bl->name = NULL;
   bl->previous = fs->bl;
   fs->bl = bl;
   lua_assert(fs->freereg == luaY_nvarstack(fs));
@@ -669,6 +678,16 @@ static l_noret undefgoto (LexState *ls, Labeldesc *gt) {
 }
 
 
+/* hidden label for 'break NAME' / 'continue NAME'; the space keeps it
+   apart from user labels */
+static TString *jumplabel (LexState *ls, const char *kind, TString *name) {
+  const char *s = luaO_pushfstring(ls->L, "%s %s", kind, getstr(name));
+  TString *ts = luaX_newstring(ls, s, strlen(s));
+  ls->L->top.p--;  /* pop 's' */
+  return ts;
+}
+
+
 static void leaveblock (FuncState *fs) {
   BlockCnt *bl = fs->bl;
   LexState *ls = fs->ls;
@@ -678,6 +697,8 @@ static void leaveblock (FuncState *fs) {
   lua_assert(bl->nactvar == fs->nactvar);  /* back to level on entry */
   if (bl->isloop)  /* has to fix pending breaks? */
     hasclose = createlabel(ls, luaS_newliteral(ls->L, "break"), 0, 0);
+  if (bl->name)
+    hasclose |= createlabel(ls, jumplabel(ls, "break", bl->name), 0, 0);
   if (!hasclose && bl->previous && bl->upval)  /* still need a 'close'? */
     luaK_codeABC(fs, OP_CLOSE, stklevel, 0, 0);
   fs->freereg = stklevel;  /* free registers */
@@ -1106,12 +1127,10 @@ static void primaryexp (LexState *ls, expdesc *v) {
 }
 
 
-static void suffixedexp (LexState *ls, expdesc *v) {
-  /* suffixedexp ->
-       primaryexp { '.' NAME | '[' exp ']' | ':' NAME funcargs | funcargs } */
+static void suffixes (LexState *ls, expdesc *v) {
+  /* suffixes -> { '.' NAME | '[' exp ']' | ':' NAME funcargs | funcargs } */
   /* '{' after an expression starts a block, so it ends the expression */
   FuncState *fs = ls->fs;
-  primaryexp(ls, v);
   for (;;) {
     switch (ls->t.token) {
       case '.': {  /* fieldsel */
@@ -1142,6 +1161,13 @@ static void suffixedexp (LexState *ls, expdesc *v) {
       default: return;
     }
   }
+}
+
+
+static void suffixedexp (LexState *ls, expdesc *v) {
+  /* suffixedexp -> primaryexp suffixes */
+  primaryexp(ls, v);
+  suffixes(ls, v);
 }
 
 
@@ -1473,10 +1499,52 @@ static void gotostat (LexState *ls) {
 /*
 ** Break statement. Semantically equivalent to "goto break".
 */
-static void breakstat (LexState *ls) {
+/* error reported at 'line', the line of the statement */
+static l_noret semerror_at (LexState *ls, int line, const char *msg) {
+  ls->linenumber = line;
+  luaK_semerror(ls, msg);
+}
+
+
+static void checkinloop (LexState *ls, const char *kind, int line) {
+  BlockCnt *bl = ls->fs->bl;
+  while (bl && !bl->isloop) bl = bl->previous;
+  if (bl == NULL)
+    semerror_at(ls, line, luaO_pushfstring(ls->L, "'%s' outside a loop", kind));
+}
+
+
+/* stat -> (BREAK | CONTINUE) [NAME]; the NAME must be on the same line */
+static void jumpstat (LexState *ls, const char *kind) {
+  FuncState *fs = ls->fs;
   int line = ls->linenumber;
-  luaX_next(ls);  /* skip break */
-  newgotoentry(ls, luaS_newliteral(ls->L, "break"), line, luaK_jump(ls->fs));
+  TString *label = luaS_new(ls->L, kind);
+  luaX_next(ls);  /* skip keyword */
+  if (ls->t.token == TK_NAME && ls->linenumber == line) {
+    TString *name = str_checkname(ls);
+    BlockCnt *bl = fs->bl;
+    while (bl && !(bl->name && eqstr(bl->name, name))) bl = bl->previous;
+    if (bl == NULL)
+      semerror_at(ls, line, luaO_pushfstring(ls->L,
+          "'%s %s': no enclosing loop or block is named '%s'",
+          kind, getstr(name), getstr(name)));
+    if (kind[0] == 'c' && !bl->isloop)
+      semerror_at(ls, line, luaO_pushfstring(ls->L,
+          "'continue %s': '%s' is a block, not a loop; use 'break %s'",
+          getstr(name), getstr(name), getstr(name)));
+    label = jumplabel(ls, kind, name);
+  }
+  else
+    checkinloop(ls, kind, line);
+  newgotoentry(ls, label, line, luaK_jump(fs));
+}
+
+
+/* where 'continue' lands: the end of the body of loop 'loop' */
+static void continuelabels (LexState *ls, BlockCnt *loop) {
+  createlabel(ls, luaS_newliteral(ls->L, "continue"), 0, 0);
+  if (loop->name)
+    createlabel(ls, jumplabel(ls, "continue", loop->name), 0, 0);
 }
 
 
@@ -1503,7 +1571,7 @@ static void labelstat (LexState *ls, TString *name, int line) {
 }
 
 
-static void whilestat (LexState *ls, int line) {
+static void whilestat (LexState *ls, int line, TString *name) {
   /* whilestat -> WHILE cond '{' block '}' */
   FuncState *fs = ls->fs;
   int whileinit;
@@ -1513,8 +1581,10 @@ static void whilestat (LexState *ls, int line) {
   whileinit = luaK_getlabel(fs);
   condexit = cond(ls);
   enterblock(fs, &bl, 1);
+  bl.name = name;
   openblock(ls);
   block(ls);
+  continuelabels(ls, &bl);
   luaK_jumpto(fs, whileinit);
   check_match(ls, '}', TK_WHILE, line);
   leaveblock(fs);
@@ -1522,17 +1592,19 @@ static void whilestat (LexState *ls, int line) {
 }
 
 
-static void repeatstat (LexState *ls, int line) {
+static void repeatstat (LexState *ls, int line, TString *name) {
   /* repeatstat -> REPEAT '{' block '}' UNTIL cond */
   int condexit;
   FuncState *fs = ls->fs;
   int repeat_init = luaK_getlabel(fs);
   BlockCnt bl1, bl2;
   enterblock(fs, &bl1, 1);  /* loop block */
+  bl1.name = name;
   enterblock(fs, &bl2, 0);  /* scope block */
   luaX_next(ls);  /* skip REPEAT */
   openblock(ls);
   statlist(ls);
+  continuelabels(ls, &bl1);
   check_match(ls, '}', TK_REPEAT, line);
   check_match(ls, TK_UNTIL, TK_REPEAT, line);
   condexit = cond(ls);  /* read condition (inside scope block) */
@@ -1594,6 +1666,7 @@ static void forbody (LexState *ls, int base, int line, int nvars, int isgen) {
   adjustlocalvars(ls, nvars);
   luaK_reserveregs(fs, nvars);
   block(ls);
+  continuelabels(ls, bl.previous);  /* 'bl.previous' is the loop block */
   leaveblock(fs);  /* end of scope for declared variables */
   fixforjump(fs, prep, luaK_getlabel(fs), 0);
   if (isgen) {  /* generic for? */
@@ -1657,12 +1730,13 @@ static void forlist (LexState *ls, TString *indexname) {
 }
 
 
-static void forstat (LexState *ls, int line) {
+static void forstat (LexState *ls, int line, TString *name) {
   /* forstat -> FOR (fornum | forlist) '}' */
   FuncState *fs = ls->fs;
   TString *varname;
   BlockCnt bl;
   enterblock(fs, &bl, 1);  /* scope for loop and control variables */
+  bl.name = name;
   luaX_next(ls);  /* skip 'for' */
   varname = str_checkname(ls);  /* first variable name */
   switch (ls->t.token) {
@@ -1684,8 +1758,10 @@ static void test_then_block (LexState *ls, int *escapelist, int line) {
   luaX_next(ls);  /* skip IF or ELSEIF */
   expr(ls, &v);  /* read condition */
   openblock(ls);
-  if (ls->t.token == TK_BREAK) {  /* 'if x { break' ? */
+  if (ls->t.token == TK_BREAK && luaX_lookahead(ls) != TK_NAME) {
+    /* 'if x { break' */
     int line = ls->linenumber;
+    checkinloop(ls, "break", line);
     luaK_goiffalse(ls->fs, &v);  /* will jump if condition is true */
     luaX_next(ls);  /* skip 'break' */
     enterblock(fs, &bl, 0);  /* must enter block before 'goto' */
@@ -1843,12 +1919,18 @@ static void funcstat (LexState *ls, int line) {
 }
 
 
-static void exprstat (LexState *ls) {
+static void exprstat (LexState *ls, TString *name) {
   /* stat -> func | assignment | compoundassign */
+  /* 'name' is a leading NAME already read, or NULL */
   FuncState *fs = ls->fs;
   struct LHS_assign v;
   BinOpr op;
-  suffixedexp(ls, &v.v);
+  if (name) {
+    namedvar(ls, name, &v.v);
+    suffixes(ls, &v.v);
+  }
+  else
+    suffixedexp(ls, &v.v);
   if (ls->t.token == '=' || ls->t.token == ',') { /* stat -> assignment ? */
     v.prev = NULL;
     restassign(ls, &v, 1);
@@ -1897,6 +1979,36 @@ static void retstat (LexState *ls) {
 }
 
 
+static void bareblock (LexState *ls, int line, TString *name) {
+  /* bareblock -> '{' block '}' */
+  FuncState *fs = ls->fs;
+  BlockCnt bl;
+  luaX_next(ls);  /* skip '{' */
+  enterblock(fs, &bl, 0);
+  bl.name = name;
+  statlist(ls);
+  leaveblock(fs);
+  check_match(ls, '}', '{', line);
+}
+
+
+static void namedstat (LexState *ls, int line, TString *name) {
+  /* namedstat -> NAME ':' (forstat | whilestat | repeatstat | bareblock) */
+  BlockCnt *bl;
+  for (bl = ls->fs->bl; bl; bl = bl->previous)
+    if (bl->name && eqstr(bl->name, name))
+      luaK_semerror(ls, luaO_pushfstring(ls->L,
+          "'%s' already names an enclosing loop or block", getstr(name)));
+  luaX_next(ls);  /* skip ':' */
+  switch (ls->t.token) {
+    case TK_FOR: forstat(ls, line, name); break;
+    case TK_WHILE: whilestat(ls, line, name); break;
+    case TK_REPEAT: repeatstat(ls, line, name); break;
+    default: bareblock(ls, line, name); break;
+  }
+}
+
+
 static void statement (LexState *ls) {
   int line = ls->linenumber;  /* may be needed for error messages */
   enterlevel(ls);
@@ -1910,22 +2022,20 @@ static void statement (LexState *ls) {
       break;
     }
     case TK_WHILE: {  /* stat -> whilestat */
-      whilestat(ls, line);
+      whilestat(ls, line, NULL);
       break;
     }
-    case '{': {  /* stat -> '{' block '}' */
-      luaX_next(ls);  /* skip '{' */
-      block(ls);
-      check_match(ls, '}', '{', line);
+    case '{': {  /* stat -> bareblock */
+      bareblock(ls, line, NULL);
       break;
     }
     case TK_THEN: case TK_DO: case TK_END: luablock_error(ls);
     case TK_FOR: {  /* stat -> forstat */
-      forstat(ls, line);
+      forstat(ls, line, NULL);
       break;
     }
     case TK_REPEAT: {  /* stat -> repeatstat */
-      repeatstat(ls, line);
+      repeatstat(ls, line, NULL);
       break;
     }
     case TK_FUNCTION: {  /* stat -> funcstat */
@@ -1950,8 +2060,26 @@ static void statement (LexState *ls) {
       retstat(ls);
       break;
     }
-    case TK_BREAK: {  /* stat -> breakstat */
-      breakstat(ls);
+    case TK_BREAK: {  /* stat -> jumpstat */
+      jumpstat(ls, "break");
+      break;
+    }
+    case TK_CONTINUE: {  /* stat -> jumpstat */
+      jumpstat(ls, "continue");
+      break;
+    }
+    case TK_NAME: {  /* stat -> namedstat | exprstat */
+      TString *name = NULL;
+      if (luaX_lookahead(ls) == ':') {
+        int next;
+        name = str_checkname(ls);
+        next = luaX_lookahead(ls);
+        if (next == TK_FOR || next == TK_WHILE || next == TK_REPEAT || next == '{') {
+          namedstat(ls, line, name);
+          break;
+        }
+      }
+      exprstat(ls, name);
       break;
     }
     case TK_GOTO: {  /* stat -> 'goto' NAME */
@@ -1960,7 +2088,7 @@ static void statement (LexState *ls) {
       break;
     }
     default: {  /* stat -> func | assignment */
-      exprstat(ls);
+      exprstat(ls, NULL);
       break;
     }
   }
