@@ -1,6 +1,12 @@
+limlua: lua 5.4.9 with 0-indexing, { } blocks and c-style syntax.
 
-This is Lua 5.4.9, released on 10 Aug 2026.
+  if x != 0 && ok { }        // comments, /* nested */
+  for i = 0; i < n; i++ { }  continue / break name
+  x += 1   len(t)   rawlen(t)
 
-For installation instructions, license details, and
-further information about Lua, see doc/readme.html.
+build:  make posix
+test:   tests/run.sh
+run:    src/limlua file.lim
 
+changes from lua: git diff lua-5.4.9
+license: MIT, see the end of src/lua.h
