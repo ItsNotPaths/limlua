@@ -444,37 +444,17 @@ static void read_string (LexState *ls, int del, SemInfo *seminfo) {
 }
 
 
-/* after '--' or '#': a long comment or the rest of the line */
-static void skip_comment (LexState *ls) {
-  if (ls->current == '[') {  /* long comment? */
-    size_t sep = skip_sep(ls);
-    luaZ_resetbuffer(ls->buff);  /* 'skip_sep' may dirty the buffer */
-    if (sep >= 2) {
-      read_long_string(ls, NULL, sep);  /* skip long comment */
-      luaZ_resetbuffer(ls->buff);  /* previous call may dirty the buff. */
-      return;
-    }
-  }
-  while (!currIsNewline(ls) && ls->current != EOZ)
-    next(ls);  /* skip until end of line (or end of file) */
-}
-
-
-/* '#x' after code on the same line is lua's length, not a comment */
-static void check_not_length (LexState *ls) {
-  char c[2] = {cast_char(ls->current), '\0'};
-  const char *word = c, *arg = "...";
+/* lua's '#t' length: name the replacements */
+static l_noret length_gone (LexState *ls) {
+  const char *arg = "x";
   if (lislalpha(ls->current)) {
     do { save_and_next(ls); } while (lislalnum(ls->current));
     save(ls, '\0');
-    word = arg = luaZ_buffer(ls->buff);
+    arg = luaZ_buffer(ls->buff);
   }
-  else if (ls->current != '(' && ls->current != '{' &&
-           ls->current != '"' && ls->current != '\'')
-    return;
   lexerror(ls, luaO_pushfstring(ls->L,
-    "'#%s' looks like lua's length operator; lim uses len(%s). "
-    "for a comment, add a space: '# %s'", word, arg, word), 0);
+    "'#' is not an operator in lim; use len(%s) to count entries, "
+    "or rawlen(%s) for the sequence border", arg, arg), 0);
 }
 
 
@@ -494,16 +474,25 @@ static int llex (LexState *ls, SemInfo *seminfo) {
         next(ls);
         if (check_next1(ls, '=')) return TK_SUBEQ;  /* compound */
         if (ls->current != '-') return '-';
+        /* else is a comment */
         next(ls);
-        skip_comment(ls);
+        if (ls->current == '[') {  /* long comment? */
+          size_t sep = skip_sep(ls);
+          luaZ_resetbuffer(ls->buff);  /* 'skip_sep' may dirty the buffer */
+          if (sep >= 2) {
+            read_long_string(ls, NULL, sep);  /* skip long comment */
+            luaZ_resetbuffer(ls->buff);  /* previous call may dirty the buff. */
+            break;
+          }
+        }
+        /* else short comment */
+        while (!currIsNewline(ls) && ls->current != EOZ)
+          next(ls);  /* skip until end of line (or end of file) */
         break;
       }
-      case '#': {  /* comment */
+      case '#': {
         next(ls);
-        if (ls->t.token != 0 && ls->lastline == ls->linenumber)
-          check_not_length(ls);
-        skip_comment(ls);
-        break;
+        length_gone(ls);
       }
       case '[': {  /* long string or simply '[' */
         size_t sep = skip_sep(ls);
