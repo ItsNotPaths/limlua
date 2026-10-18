@@ -12,11 +12,10 @@ PLAT= guess
 # LUA_ROOT, LUA_LDIR, and LUA_CDIR in luaconf.h.
 INSTALL_TOP= /usr/local
 INSTALL_BIN= $(INSTALL_TOP)/bin
-INSTALL_INC= $(INSTALL_TOP)/include
+INSTALL_INC= $(INSTALL_TOP)/include/limlua
 INSTALL_LIB= $(INSTALL_TOP)/lib
-INSTALL_MAN= $(INSTALL_TOP)/man/man1
-INSTALL_LMOD= $(INSTALL_TOP)/share/lua/$V
-INSTALL_CMOD= $(INSTALL_TOP)/lib/lua/$V
+INSTALL_LMOD= $(INSTALL_TOP)/share/limlua/$V
+INSTALL_CMOD= $(INSTALL_TOP)/lib/limlua/$V
 
 # How to install. If your install program does not support "-p", then
 # you may have to run ranlib on the installed liblua.a.
@@ -39,10 +38,9 @@ RM= rm -f
 PLATS= guess aix bsd c89 freebsd generic ios linux linux-readline macosx mingw posix solaris
 
 # What to install.
-TO_BIN= lua luac
+TO_BIN= limlua limluac
 TO_INC= lua.h luaconf.h lualib.h lauxlib.h lua.hpp
-TO_LIB= liblua.a
-TO_MAN= lua.1 luac.1
+TO_LIB= liblimlua.a
 
 # Lua version and release.
 V= 5.4
@@ -55,17 +53,15 @@ $(PLATS) help test clean:
 	@cd src && $(MAKE) $@
 
 install: dummy
-	cd src && $(MKDIR) $(INSTALL_BIN) $(INSTALL_INC) $(INSTALL_LIB) $(INSTALL_MAN) $(INSTALL_LMOD) $(INSTALL_CMOD)
+	cd src && $(MKDIR) $(INSTALL_BIN) $(INSTALL_INC) $(INSTALL_LIB) $(INSTALL_LMOD) $(INSTALL_CMOD)
 	cd src && $(INSTALL_EXEC) $(TO_BIN) $(INSTALL_BIN)
 	cd src && $(INSTALL_DATA) $(TO_INC) $(INSTALL_INC)
 	cd src && $(INSTALL_DATA) $(TO_LIB) $(INSTALL_LIB)
-	cd doc && $(INSTALL_DATA) $(TO_MAN) $(INSTALL_MAN)
 
 uninstall:
 	cd src && cd $(INSTALL_BIN) && $(RM) $(TO_BIN)
 	cd src && cd $(INSTALL_INC) && $(RM) $(TO_INC)
 	cd src && cd $(INSTALL_LIB) && $(RM) $(TO_LIB)
-	cd doc && cd $(INSTALL_MAN) && $(RM) $(TO_MAN)
 
 local:
 	$(MAKE) install INSTALL_TOP=../install
@@ -82,12 +78,10 @@ echo:
 	@echo "TO_BIN= $(TO_BIN)"
 	@echo "TO_INC= $(TO_INC)"
 	@echo "TO_LIB= $(TO_LIB)"
-	@echo "TO_MAN= $(TO_MAN)"
 	@echo "INSTALL_TOP= $(INSTALL_TOP)"
 	@echo "INSTALL_BIN= $(INSTALL_BIN)"
 	@echo "INSTALL_INC= $(INSTALL_INC)"
 	@echo "INSTALL_LIB= $(INSTALL_LIB)"
-	@echo "INSTALL_MAN= $(INSTALL_MAN)"
 	@echo "INSTALL_LMOD= $(INSTALL_LMOD)"
 	@echo "INSTALL_CMOD= $(INSTALL_CMOD)"
 	@echo "INSTALL_EXEC= $(INSTALL_EXEC)"

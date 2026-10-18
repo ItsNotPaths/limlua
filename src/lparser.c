@@ -812,7 +812,7 @@ static int block_follow (LexState *ls) {
 
 static l_noret luablock_error (LexState *ls) {
   luaX_syntaxerror(ls,
-      "lim blocks are '{ ... }', with no 'then', 'do' or 'end'");
+      "limlua blocks are '{ ... }', with no 'then', 'do' or 'end'");
 }
 
 
@@ -820,7 +820,7 @@ static l_noret luablock_error (LexState *ls) {
 static l_noret stepop_error (LexState *ls) {
   luaX_syntaxerror(ls, ls->t.token == TK_INC
       ? "'++' only works as a for loop's step; use 'x += 1'"
-      : "lim comments are '//', not '--'; 'x--' only works as a for loop's step");
+      : "limlua comments are '//', not '--'; 'x--' only works as a for loop's step");
 }
 
 
@@ -1061,8 +1061,8 @@ static int explist (LexState *ls, expdesc *v) {
 
 static l_noret callsugar_error (LexState *ls) {
   luaX_syntaxerror(ls, ls->t.token == '{'
-      ? "lim calls need parentheses: f({...})"
-      : "lim calls need parentheses: f(\"...\")");
+      ? "limlua calls need parentheses: f({...})"
+      : "limlua calls need parentheses: f(\"...\")");
 }
 
 
@@ -1807,7 +1807,7 @@ static void forstat (LexState *ls, int line, TString *name) {
   luaX_next(ls);  /* skip 'for' */
   if (ls->t.token == '(')
     luaX_syntaxerror(ls,
-        "lim's for has no parentheses: for i = 0; i < n; i += 1 { }");
+        "limlua's for has no parentheses: for i = 0; i < n; i += 1 { }");
   varname = str_checkname(ls);  /* first variable name */
   switch (ls->t.token) {
     case '=': {

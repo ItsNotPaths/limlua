@@ -32,15 +32,15 @@ CMCFLAGS=
 
 PLATS= guess aix bsd c89 freebsd generic ios linux linux-readline macosx mingw posix solaris
 
-LUA_A=	liblua.a
+LUA_A=	liblimlua.a
 CORE_O=	lapi.o lcode.o lctype.o ldebug.o ldo.o ldump.o lfunc.o lgc.o llex.o lmem.o lobject.o lopcodes.o lparser.o lstate.o lstring.o ltable.o ltm.o lundump.o lvm.o lzio.o
 LIB_O=	lauxlib.o lbaselib.o lcorolib.o ldblib.o liolib.o lmathlib.o loadlib.o loslib.o lstrlib.o ltablib.o lutf8lib.o linit.o
 BASE_O= $(CORE_O) $(LIB_O) $(MYOBJS)
 
-LUA_T=	lua
+LUA_T=	limlua
 LUA_O=	lua.o
 
-LUAC_T=	luac
+LUAC_T=	limluac
 LUAC_O=	luac.o
 
 ALL_O= $(BASE_O) $(LUA_O) $(LUAC_O)
@@ -132,10 +132,10 @@ Darwin macos macosx:
 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_MACOSX -DLUA_USE_READLINE" SYSLIBS="-lreadline"
 
 mingw:
-	$(MAKE) "LUA_A=lua54.dll" "LUA_T=lua.exe" \
+	$(MAKE) "LUA_A=limlua54.dll" "LUA_T=limlua.exe" \
 	"AR=$(CC) -shared -o" "RANLIB=strip --strip-unneeded" \
-	"SYSCFLAGS=-DLUA_BUILD_AS_DLL" "SYSLIBS=" "SYSLDFLAGS=-s" lua.exe
-	$(MAKE) "LUAC_T=luac.exe" luac.exe
+	"SYSCFLAGS=-DLUA_BUILD_AS_DLL" "SYSLIBS=" "SYSLDFLAGS=-s" limlua.exe
+	$(MAKE) "LUAC_T=limluac.exe" limluac.exe
 
 posix:
 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_POSIX"

@@ -88,7 +88,7 @@ local function collect(f) {
   for i = 0; i < 2; t.n++ { i += 1 }
   assert(t.n == 2, "a field as the step target")
   local plus = "'++' only works as a for loop's step; use 'x += 1'"
-  local minus = "lim comments are '//', not '--'; 'x--' only works as a for loop's step"
+  local minus = "limlua comments are '//', not '--'; 'x--' only works as a for loop's step"
   for _, src in ipairs({"x = 1\nx++", "print(a[i++])", "local y = x++", "++x",
                         "for i = 0; i < 1; f(function() { x++ }) { }"}) {
     assert(has(err(src), plus), src)
@@ -101,7 +101,7 @@ local function collect(f) {
 
 // errors for C habits
 {
-  assert(has(err("for (i = 0; i < 3; i += 1) { }"), "lim's for has no parentheses"), "for (")
+  assert(has(err("for (i = 0; i < 3; i += 1) { }"), "limlua's for has no parentheses"), "for (")
   assert(has(err("for i = 0 { }"), "',' (numeric for) or ';' (c-style for) expected"), "neither , nor ;")
   assert(has(err("for i = 0; i < 3 { }"), "';' expected: for i = 0; cond; step { }"), "missing second ;")
   assert(has(err("for i = 0; i < 3; local z = 1 { }"), "the step of a for is an assignment or a call"), "bad step")

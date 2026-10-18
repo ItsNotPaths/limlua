@@ -24,6 +24,6 @@ local function has(s, part) { return string.find(s, part, 0, true) != nil }
   local msg = err("x = 1 /* never\nclosed")
   assert(has(msg, "unfinished '/*' comment (opened at line 1)"), "unfinished block names its line: " .. msg)
   assert(has(err("/* /* */"), "unfinished '/*' comment"), "unbalanced nesting")
-  assert(has(err("-- old lua comment"), "lim comments are '//', not '--'"), "-- points to //")
-  assert(has(err("--[[ old block ]]"), "lim comments are '//', not '--'"), "--[[ points to //")
+  assert(has(err("-- old lua comment"), "limlua comments are '//', not '--'"), "-- points to //")
+  assert(has(err("--[[ old block ]]"), "limlua comments are '//', not '--'"), "--[[ points to //")
 }

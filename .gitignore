@@ -1,5 +1,5 @@
 main.md
 *.o
 *.a
-src/lua
-src/luac
+src/limlua
+src/limluac

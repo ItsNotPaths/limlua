@@ -22,11 +22,11 @@
 
 
 #if !defined(LUA_PROGNAME)
-#define LUA_PROGNAME		"lua"
+#define LUA_PROGNAME		"limlua"
 #endif
 
 #if !defined(LUA_INIT_VAR)
-#define LUA_INIT_VAR		"LUA_INIT"
+#define LUA_INIT_VAR		"LIMLUA_INIT"
 #endif
 
 #define LUA_INITVARVERSION	LUA_INIT_VAR LUA_VERSUFFIX
@@ -166,7 +166,7 @@ static int docall (lua_State *L, int narg, int nres) {
 
 
 static void print_version (void) {
-  lua_writestring(LUA_COPYRIGHT, strlen(LUA_COPYRIGHT));
+  lua_writestring(LIMLUA_COPYRIGHT, strlen(LIMLUA_COPYRIGHT));
   lua_writeline();
 }
 

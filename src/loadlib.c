@@ -261,11 +261,11 @@ static lua_CFunction lsys_sym (lua_State *L, void *lib, const char *sym) {
 ** variables that Lua check to set its paths.
 */
 #if !defined(LUA_PATH_VAR)
-#define LUA_PATH_VAR    "LUA_PATH"
+#define LUA_PATH_VAR    "LIMLUA_PATH"
 #endif
 
 #if !defined(LUA_CPATH_VAR)
-#define LUA_CPATH_VAR   "LUA_CPATH"
+#define LUA_CPATH_VAR   "LIMLUA_CPATH"
 #endif
 
 

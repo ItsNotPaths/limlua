@@ -454,7 +454,7 @@ static l_noret length_gone (LexState *ls) {
     arg = luaZ_buffer(ls->buff);
   }
   lexerror(ls, luaO_pushfstring(ls->L,
-    "'#' is not an operator in lim; use len(%s) to count entries, "
+    "'#' is not an operator in limlua; use len(%s) to count entries, "
     "or rawlen(%s) for the sequence border", arg, arg), 0);
 }
 

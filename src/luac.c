@@ -28,7 +28,7 @@
 static void PrintFunction(const Proto* f, int full);
 #define luaU_print	PrintFunction
 
-#define PROGNAME	"luac"		/* default program name */
+#define PROGNAME	"limluac"		/* default program name */
 #define OUTPUT		PROGNAME ".out"	/* default output file */
 
 static int listing=0;			/* list bytecodes? */
@@ -115,7 +115,7 @@ static int doargs(int argc, char* argv[])
  }
  if (version)
  {
-  printf("%s\n",LUA_COPYRIGHT);
+  printf("%s\n",LIMLUA_COPYRIGHT);
   if (version==argc-1) exit(EXIT_SUCCESS);
  }
  return i;

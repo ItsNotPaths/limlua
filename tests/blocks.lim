@@ -75,7 +75,7 @@ local function has(s, part) { return string.find(s, part, 0, true) != nil }
 {
   for _, src in ipairs({"if x then y = 1 end", "while x do end", "for i = 0, 1 do end",
                         "do local a = 1 end", "function f() end", "if x {\n y = 1\nend"}) {
-    assert(has(err(src), "lim blocks are '{ ... }'"), src)
+    assert(has(err(src), "limlua blocks are '{ ... }'"), src)
   }
   local msg = err("if x {\n  y = 1\n")
   assert(has(msg, "'}' expected (to close 'if' at line 1)"), "unclosed names the opener: " .. msg)

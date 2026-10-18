@@ -23,7 +23,7 @@
 */
 #define LUAC_VERSION  (((LUA_VERSION_NUM / 100) * 16) + LUA_VERSION_NUM % 100)
 
-#define LUAC_FORMAT	0	/* this is the official format */
+#define LUAC_FORMAT	0x4C	/* limlua: lua and limlua cannot load each other */
 
 /* load one chunk; from lundump.c */
 LUAI_FUNC LClosure* luaU_undump (lua_State* L, ZIO* Z, const char* name);

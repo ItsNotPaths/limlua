@@ -27,6 +27,7 @@
 #define LUA_RELEASE	LUA_VERSION "." LUA_VERSION_RELEASE
 #define LUA_COPYRIGHT	LUA_RELEASE "  Copyright (C) 1994-2026 Lua.org, PUC-Rio"
 #define LUA_AUTHORS	"R. Ierusalimschy, L. H. de Figueiredo, W. Celes"
+#define LIMLUA_COPYRIGHT	"limlua, based on " LUA_COPYRIGHT
 
 
 /* mark for precompiled code ('<esc>Lua') */
