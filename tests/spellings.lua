@@ -40,7 +40,7 @@ do
   assert(syntax_err("x = a & &b"), "& &")
   assert(syntax_err("x = ! = 1"), "! =")
   assert(syntax_err("x != 1", "'!='"), "!= token name")
-  assert(syntax_err("x = a ~= b"), "~= removed")
+  assert(syntax_err("x = a ~= b", "use '!='"), "~= points to !=")
   assert(syntax_err("x && 1", "'&&'"), "&& token name")
   assert(syntax_err("x || 1", "'||'"), "|| token name")
   assert(syntax_err("x and 1", "'and'"), "and token name")

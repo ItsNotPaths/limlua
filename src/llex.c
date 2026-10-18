@@ -532,6 +532,12 @@ static int llex (LexState *ls, SemInfo *seminfo) {
         else if (check_next1(ls, '>')) return TK_SHR;  /* '>>' */
         else return '>';
       }
+      case '~': {
+        next(ls);
+        if (ls->current == '=')
+          lexerror(ls, "'~=' is not an operator; use '!=' for not-equal", 0);
+        return '~';
+      }
       case '/': {
         next(ls);
         if (check_next1(ls, '/')) return TK_IDIV;  /* '//' */
