@@ -8,5 +8,6 @@ build:  make posix
 test:   tests/run.sh
 run:    src/limlua file.lim
 
+editor grammar:   tree-sitter/
 changes from lua: git diff lua-5.4.9
 license: MIT, see the end of src/lua.h

@@ -1,0 +1,9 @@
+tree-sitter grammar for limlua (.lim). based on tree-sitter-lua.
+
+edit:   grammar.js, src/scanner.c, queries/highlights.scm
+build:  tree-sitter generate && tree-sitter test    (in this folder; mise.toml pins the cli)
+oket:   ~/.local/share/oket/oket-grammar lim ~/Projects/limlua/tree-sitter
+        or from github: oket-grammar lim https://github.com/ItsNotPaths/limlua "" tree-sitter
+
+the grammar is named `lim`, so oket picks it for .lim files.
+src/parser.c is generated but committed: oket-grammar builds from it.

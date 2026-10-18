@@ -1,0 +1,390 @@
+================================================================================
+blocks
+================================================================================
+
+if a { x = 1 } elseif b { x = 2 } else if c { x = 3 } else { x = 4 }
+while a { }
+repeat { local k = 1 } until k
+{ local s = 1 }
+
+--------------------------------------------------------------------------------
+
+(chunk
+  (if_statement
+    (identifier)
+    (block
+      (assignment_statement
+        (variable_list
+          (identifier))
+        (expression_list
+          (number))))
+    (elseif_statement
+      (identifier)
+      (block
+        (assignment_statement
+          (variable_list
+            (identifier))
+          (expression_list
+            (number)))))
+    (elseif_statement
+      (identifier)
+      (block
+        (assignment_statement
+          (variable_list
+            (identifier))
+          (expression_list
+            (number)))))
+    (else_statement
+      (block
+        (assignment_statement
+          (variable_list
+            (identifier))
+          (expression_list
+            (number))))))
+  (while_statement
+    (identifier)
+    (block))
+  (repeat_statement
+    (block
+      (variable_declaration
+        (assignment_statement
+          (variable_list
+            (identifier))
+          (expression_list
+            (number)))))
+    (identifier))
+  (block_statement
+    (block
+      (variable_declaration
+        (assignment_statement
+          (variable_list
+            (identifier))
+          (expression_list
+            (number)))))))
+
+================================================================================
+for loops
+================================================================================
+
+for i = 0, 9 { }
+for k, v in pairs(t) { }
+for i = 0; i < n; i++ { }
+for i = 9; i >= 0; i-- { }
+for i = 0; ; i += 1 { }
+for i = 0; i < n; { }
+
+--------------------------------------------------------------------------------
+
+(chunk
+  (for_statement
+    (for_numeric_clause
+      (identifier)
+      (number)
+      (number))
+    (block))
+  (for_statement
+    (for_generic_clause
+      (variable_list
+        (identifier)
+        (identifier))
+      (expression_list
+        (function_call
+          (identifier)
+          (arguments
+            (identifier)))))
+    (block))
+  (for_statement
+    (for_c_clause
+      (identifier)
+      (number)
+      (binary_expression
+        (identifier)
+        (identifier))
+      (update_statement
+        (identifier)))
+    (block))
+  (for_statement
+    (for_c_clause
+      (identifier)
+      (number)
+      (binary_expression
+        (identifier)
+        (number))
+      (update_statement
+        (identifier)))
+    (block))
+  (for_statement
+    (for_c_clause
+      (identifier)
+      (number)
+      (compound_assignment
+        (identifier)
+        (number)))
+    (block))
+  (for_statement
+    (for_c_clause
+      (identifier)
+      (number)
+      (binary_expression
+        (identifier)
+        (identifier)))
+    (block)))
+
+================================================================================
+labels and jumps
+================================================================================
+
+outer: for i = 0, 1 { continue outer }
+b: { break b }
+w: while x { }
+r: repeat { } until x
+obj:method()
+
+--------------------------------------------------------------------------------
+
+(chunk
+  (labeled_statement
+    (identifier)
+    (for_statement
+      (for_numeric_clause
+        (identifier)
+        (number)
+        (number))
+      (block
+        (continue_statement
+          (identifier)))))
+  (labeled_statement
+    (identifier)
+    (block_statement
+      (block
+        (break_statement
+          (identifier)))))
+  (labeled_statement
+    (identifier)
+    (while_statement
+      (identifier)
+      (block)))
+  (labeled_statement
+    (identifier)
+    (repeat_statement
+      (block)
+      (identifier)))
+  (function_call
+    (method_index_expression
+      (identifier)
+      (identifier))
+    (arguments)))
+
+================================================================================
+break name only on the same line
+================================================================================
+
+for i = 0, 1 {
+  break
+  x = 1
+}
+
+--------------------------------------------------------------------------------
+
+(chunk
+  (for_statement
+    (for_numeric_clause
+      (identifier)
+      (number)
+      (number))
+    (block
+      (break_statement)
+      (assignment_statement
+        (variable_list
+          (identifier))
+        (expression_list
+          (number))))))
+
+================================================================================
+compound assignment
+================================================================================
+
+x += 1
+t.n -= 2
+s ..= "a"
+x *= 2 x /= 2 x %= 2
+
+--------------------------------------------------------------------------------
+
+(chunk
+  (compound_assignment
+    (identifier)
+    (number))
+  (compound_assignment
+    (dot_index_expression
+      (identifier)
+      (identifier))
+    (number))
+  (compound_assignment
+    (identifier)
+    (string
+      (string_content)))
+  (compound_assignment
+    (identifier)
+    (number))
+  (compound_assignment
+    (identifier)
+    (number))
+  (compound_assignment
+    (identifier)
+    (number)))
+
+================================================================================
+operators
+================================================================================
+
+x = !a && b || c != d
+y = not a and b or c ~ d
+
+--------------------------------------------------------------------------------
+
+(chunk
+  (assignment_statement
+    (variable_list
+      (identifier))
+    (expression_list
+      (binary_expression
+        (binary_expression
+          (unary_expression
+            (identifier))
+          (identifier))
+        (binary_expression
+          (identifier)
+          (identifier)))))
+  (assignment_statement
+    (variable_list
+      (identifier))
+    (expression_list
+      (binary_expression
+        (binary_expression
+          (unary_expression
+            (identifier))
+          (identifier))
+        (binary_expression
+          (identifier)
+          (identifier))))))
+
+================================================================================
+comments
+================================================================================
+
+// line
+x = 1 // trailing
+/* block /* nested */ still */
+y = /* inline */ 2
+
+--------------------------------------------------------------------------------
+
+(chunk
+  (comment)
+  (assignment_statement
+    (variable_list
+      (identifier))
+    (expression_list
+      (number)))
+  (comment)
+  (comment)
+  (assignment_statement
+    (variable_list
+      (identifier))
+    (comment)
+    (expression_list
+      (number))))
+
+================================================================================
+functions
+================================================================================
+
+function t:m(a, ...) { return a }
+local function f() { }
+local g = function(x) { return {x} }
+local c <const> = 1
+
+--------------------------------------------------------------------------------
+
+(chunk
+  (function_declaration
+    (method_index_expression
+      (identifier)
+      (identifier))
+    (parameters
+      (identifier)
+      (vararg_expression))
+    (block
+      (return_statement
+        (expression_list
+          (identifier)))))
+  (function_declaration
+    (identifier)
+    (parameters)
+    (block))
+  (variable_declaration
+    (assignment_statement
+      (variable_list
+        (identifier))
+      (expression_list
+        (function_definition
+          (parameters
+            (identifier))
+          (block
+            (return_statement
+              (expression_list
+                (table_constructor
+                  (field
+                    (identifier))))))))))
+  (variable_declaration
+    (assignment_statement
+      (variable_list
+        (identifier)
+        (attribute
+          (identifier)))
+      (expression_list
+        (number)))))
+
+================================================================================
+strings
+================================================================================
+
+s = [[long
+string]] .. [==[ with ]] inside ]==] .. "esc\n" .. 'q'
+
+--------------------------------------------------------------------------------
+
+(chunk
+  (assignment_statement
+    (variable_list
+      (identifier))
+    (expression_list
+      (binary_expression
+        (string
+          (string_content))
+        (binary_expression
+          (string
+            (string_content))
+          (binary_expression
+            (string
+              (string_content
+                (escape_sequence)))
+            (string
+              (string_content))))))))
+
+================================================================================
+hash bang
+================================================================================
+
+#!/usr/bin/env limlua
+print(1)
+
+--------------------------------------------------------------------------------
+
+(chunk
+  (hash_bang_line)
+  (function_call
+    (identifier)
+    (arguments
+      (number))))
