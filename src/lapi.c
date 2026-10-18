@@ -435,6 +435,13 @@ LUA_API lua_Unsigned lua_rawlen (lua_State *L, int idx) {
 }
 
 
+LUA_API lua_Unsigned lua_count (lua_State *L, int idx) {
+  const TValue *o = index2value(L, idx);
+  api_check(L, ttistable(o), "table expected");
+  return luaH_count(hvalue(o));
+}
+
+
 LUA_API lua_CFunction lua_tocfunction (lua_State *L, int idx) {
   const TValue *o = index2value(L, idx);
   if (ttislcf(o)) return fvalue(o);

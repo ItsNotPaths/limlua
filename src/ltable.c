@@ -985,6 +985,19 @@ lua_Unsigned luaH_getn (Table *t) {
 
 
 
+/* number of non-nil values, in both the array and hash parts */
+lua_Unsigned luaH_count (const Table *t) {
+  lua_Unsigned n = 0;
+  unsigned int i, asize = luaH_realasize(t);
+  for (i = 0; i < asize; i++)
+    if (!isempty(&t->array[i])) n++;
+  for (i = 0; i < cast_uint(sizenode(t)); i++)
+    if (!isempty(gval(gnode(t, i)))) n++;
+  return n;
+}
+
+
+
 #if defined(LUA_DEBUG)
 
 /* export these functions for the test library */

@@ -163,6 +163,16 @@ static int luaB_rawlen (lua_State *L) {
 }
 
 
+/* every non-nil entry of a table, or the bytes of a string */
+static int luaB_len (lua_State *L) {
+  int t = lua_type(L, 1);
+  luaL_argexpected(L, t == LUA_TTABLE || t == LUA_TSTRING, 1,
+                      "table or string");
+  lua_pushinteger(L, t == LUA_TTABLE ? lua_count(L, 1) : lua_rawlen(L, 1));
+  return 1;
+}
+
+
 static int luaB_rawget (lua_State *L) {
   luaL_checktype(L, 1, LUA_TTABLE);
   luaL_checkany(L, 2);
@@ -518,6 +528,7 @@ static const luaL_Reg base_funcs[] = {
   {"print", luaB_print},
   {"warn", luaB_warn},
   {"rawequal", luaB_rawequal},
+  {"len", luaB_len},
   {"rawlen", luaB_rawlen},
   {"rawget", luaB_rawget},
   {"rawset", luaB_rawset},
