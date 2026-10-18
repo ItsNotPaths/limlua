@@ -1,0 +1,94 @@
+-- '{ }' blocks for if / while / for / repeat / function / bare scope; calls need '( )'
+
+local function err(src) {
+  local f, msg = load(src, "=src")
+  assert(f == nil, "expected an error: " .. src)
+  return msg
+}
+
+local function has(s, part) { return string.find(s, part, 0, true) != nil }
+
+-- if chains: 'else if' and 'elseif' both work
+{
+  local function sign(x) {
+    if x < 0 { return "neg" } elseif x == 0 { return "zero" } else if x < 10 { return "small" } else { return "big" }
+  }
+  assert(sign(-1) == "neg" && sign(0) == "zero" && sign(5) == "small" && sign(50) == "big", "if chain")
+  local r
+  if false { r = 1 } else { r = 2 }
+  assert(r == 2, "else")
+  if true { } else { r = 3 }
+  assert(r == 2, "empty then")
+  if nil == {} { r = 4 }
+  assert(r == 2, "table constructor in a condition")
+}
+
+-- loops
+{
+  local n = 0
+  while n < 3 { n += 1 }
+  assert(n == 3, "while")
+  local seen = {}
+  repeat { local k = n; n -= 1; seen[len(seen)] = k } until k == 1
+  assert(len(seen) == 3 && n == 0, "repeat: 'until' sees locals of the block")
+  for i = 0, 4 { n += i }
+  assert(n == 10, "numeric for")
+  local keys = 0
+  for k, v in pairs({a = 1, b = 2}) { keys += 1 }
+  assert(keys == 2, "generic for")
+}
+
+-- break, including the 'if c { break }' fast path
+{
+  local last
+  for i = 0, 9 { if i == 3 { break } last = i }
+  assert(last == 2, "break alone in the block")
+  for i = 0, 9 { if i == 5 { break; } }
+  for i = 0, 9 { if i == 4 { break } else { last = i } }
+  assert(last == 3, "break with an else")
+  local hits = 0
+  while true { hits += 1; if hits > 2 { break } }
+  assert(hits == 3, "break in while")
+}
+
+-- functions and scopes
+{
+  local t = {v = 2}
+  function t.get() { return t.v }
+  function t:twice() { return self.v * 2 }
+  local f = function(a) { return a + 1 }
+  assert(t.get() == 2 && t:twice() == 4 && f(1) == 2, "function forms")
+  local function none() { return }
+  assert(none() == nil, "bare return before '}'")
+  local function tbl() { return {1} }
+  assert(tbl()[0] == 1, "return of a table")
+  { local hidden = 1 }
+  assert(hidden == nil, "bare block scopes its locals")
+  local x = 1
+  local function noop() { }
+  noop()
+  { x = 2 }
+  assert(x == 2, "call, then a block on the next line")
+}
+
+-- old lua block syntax names the lim form
+{
+  for _, src in ipairs({"if x then y = 1 end", "while x do end", "for i = 0, 1 do end",
+                        "do local a = 1 end", "function f() end", "if x {\n y = 1\nend"}) {
+    assert(has(err(src), "lim blocks are '{ ... }'"), src)
+  }
+  local msg = err("if x {\n  y = 1\n")
+  assert(has(msg, "'}' expected (to close 'if' at line 1)"), "unclosed names the opener: " .. msg)
+  assert(has(err("function f() {\n  if x {\n}\n"), "close 'function' at line 1"), "unclosed function")
+  assert(has(err("x = 1 }"), "'}' without a matching '{'"), "stray '}'")
+}
+
+-- call sugar is gone
+{
+  for _, src in ipairs({"print {1}", "obj:m {1}"}) {
+    assert(has(err(src), "f({...})"), src)
+  }
+  for _, src in ipairs({"print \"hi\"", "local s = f \"a\"", "obj:m \"s\""}) {
+    assert(has(err(src), "f(\"...\")"), src)
+  }
+}
