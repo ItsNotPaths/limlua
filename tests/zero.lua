@@ -6,10 +6,10 @@ local function isborder(t, n)
 end
 
 local function same(t, list)
-  for i = 0, #list - 1 do
+  for i = 0, rawlen(list) - 1 do
     if t[i] != list[i] then return false end
   end
-  return #t == #list
+  return rawlen(t) == rawlen(list)
 end
 
 local function count(t)
@@ -26,15 +26,15 @@ end
 -- empty table and key 0
 do
   local t = {}
-  assert(#t == 0, "empty len")
+  assert(rawlen(t) == 0, "empty len")
   assert(next(t) == nil, "empty next")
   t[0] = "a"
-  assert(#t == 1, "t[0] alone has len 1")
+  assert(rawlen(t) == 1, "t[0] alone has len 1")
   t[1] = "b"
-  assert(#t == 2, "0,1 len 2")
+  assert(rawlen(t) == 2, "0,1 len 2")
   t[0] = nil
-  assert(isborder(t, #t), "border after removing key 0")
-  assert(#t == 0 or #t == 2, "len after removing key 0")
+  assert(isborder(t, rawlen(t)), "border after removing key 0")
+  assert(rawlen(t) == 0 or rawlen(t) == 2, "len after removing key 0")
 end
 
 -- constructors
@@ -42,56 +42,56 @@ do
   local t = {10, 20, 30}
   assert(t[0] == 10 and t[1] == 20 and t[2] == 30, "constructor keys")
   assert(t[3] == nil and t[-1] == nil, "constructor bounds")
-  assert(#t == 3, "constructor len")
+  assert(rawlen(t) == 3, "constructor len")
 
   local function three() return "x", "y", "z" end
   local function pack(...) return {...} end
   local v = pack(1, 2, 3)
-  assert(v[0] == 1 and v[2] == 3 and #v == 3, "{...}")
-  assert(#pack() == 0 and pack()[0] == nil, "{...} empty")
+  assert(v[0] == 1 and v[2] == 3 and rawlen(v) == 3, "{...}")
+  assert(rawlen(pack()) == 0 and pack()[0] == nil, "{...} empty")
 
   local m = {three()}
-  assert(m[0] == "x" and m[2] == "z" and #m == 3, "{f()}")
+  assert(m[0] == "x" and m[2] == "z" and rawlen(m) == 3, "{f()}")
   local m2 = {0, three()}
-  assert(m2[0] == 0 and m2[1] == "x" and m2[3] == "z" and #m2 == 4, "{a, f()}")
+  assert(m2[0] == 0 and m2[1] == "x" and m2[3] == "z" and rawlen(m2) == 4, "{a, f()}")
   local m3 = {three(), 9}
-  assert(m3[0] == "x" and m3[1] == 9 and #m3 == 2, "{f(), a} truncates")
+  assert(m3[0] == "x" and m3[1] == 9 and rawlen(m3) == 2, "{f(), a} truncates")
 
   local mixed = {1, 2, x = 3, [10] = 4, 5}
   assert(mixed[0] == 1 and mixed[1] == 2 and mixed[2] == 5, "mixed list")
   assert(mixed.x == 3 and mixed[10] == 4, "mixed hash")
-  assert(#mixed == 3, "mixed len")
+  assert(rawlen(mixed) == 3, "mixed len")
 
   -- more items than one SETLIST flush (50), with and without multret tail
   local parts = {}
-  for i = 0, 299 do parts[#parts] = tostring(i) end
+  for i = 0, 299 do parts[rawlen(parts)] = tostring(i) end
   local big = load("return {" .. table.concat(parts, ",") .. "}")()
-  assert(#big == 300, "big constructor len")
+  assert(rawlen(big) == 300, "big constructor len")
   for i = 0, 299 do assert(big[i] == i, "big constructor key " .. i) end
   local bigm = load("local f = ... return {" .. table.concat(parts, ",") .. ", f()}")(three)
-  assert(#bigm == 303 and bigm[299] == 299 and bigm[300] == "x" and bigm[302] == "z", "big constructor multret")
+  assert(rawlen(bigm) == 303 and bigm[299] == 299 and bigm[300] == "x" and bigm[302] == "z", "big constructor multret")
 end
 
 -- holes, negative keys, float keys
 do
   local t = {1, nil, 3}
-  assert(isborder(t, #t), "hole border")
+  assert(isborder(t, rawlen(t)), "hole border")
   t = {}
   t[-1] = "neg"
   t[-5] = "neg5"
-  assert(#t == 0, "negative keys are not a sequence")
+  assert(rawlen(t) == 0, "negative keys are not a sequence")
   t[0] = "z"
-  assert(#t == 1 and t[-1] == "neg", "negative keys kept")
+  assert(rawlen(t) == 1 and t[-1] == "neg", "negative keys kept")
 
   t = {}
   t[1.0] = "one"
   assert(t[1] == "one" and math.type(next(t)) == "integer", "float key normalised")
   t[0.0] = "zero"
-  assert(t[0] == "zero" and #t == 2, "float 0.0")
+  assert(t[0] == "zero" and rawlen(t) == 2, "float 0.0")
   t[-0.0] = "negzero"
   assert(t[0] == "negzero", "-0.0 is key 0")
   t[0.5] = "half"
-  assert(t[0.5] == "half" and #t == 2, "non-integral float key")
+  assert(t[0.5] == "half" and rawlen(t) == 2, "non-integral float key")
   assert(t[2 ^ 53] == nil, "huge float absent")
 end
 
@@ -99,23 +99,23 @@ end
 do
   local t = {}
   for i = 0, 10000 do t[i] = i * 2 end
-  assert(#t == 10001, "grown len")
+  assert(rawlen(t) == 10001, "grown len")
   for i = 0, 10000 do assert(t[i] == i * 2, "grown key") end
   assert(count(t) == 10001, "grown count")
 
   for i = 10, 10000 do t[i] = nil end
-  assert(#t == 10, "shrunk len")
+  assert(rawlen(t) == 10, "shrunk len")
   for i = 0, 200 do t["s" .. i] = i end  -- force rehash
-  assert(#t == 10, "shrunk len after rehash")
+  assert(rawlen(t) == 10, "shrunk len after rehash")
   for i = 0, 9 do assert(t[i] == i * 2, "survivor " .. i) end
   assert(t[10] == nil and t[5000] == nil, "removed stay removed")
 
   for i = 10000, 0, -1 do t[i] = -i end  -- reinsert from the top down
-  assert(#t == 10001, "regrown len")
+  assert(rawlen(t) == 10001, "regrown len")
   for i = 0, 10000 do assert(t[i] == -i, "regrown key") end
 
   for i = 0, 10000, 2 do t[i] = nil end
-  assert(isborder(t, #t), "half-empty border")
+  assert(isborder(t, rawlen(t)), "half-empty border")
   for i = 1, 10000, 2 do assert(t[i] == -i, "odd kept") end
 end
 
@@ -125,12 +125,12 @@ do
   for i = 1, 16 do t["k" .. i] = i end
   for i = 1, 16 do t["k" .. i] = nil end
   for i = 0, 5 do t[i] = i end
-  assert(#t == 6, "hash-only sequence len")
+  assert(rawlen(t) == 6, "hash-only sequence len")
   t[7] = 7
-  assert(isborder(t, #t), "hash-only border with gap")
+  assert(isborder(t, rawlen(t)), "hash-only border with gap")
   local u = {[0] = 1}
   u[math.maxinteger] = 1
-  assert(isborder(u, #u), "maxinteger key border")
+  assert(isborder(u, rawlen(u)), "maxinteger key border")
 end
 
 -- keys 0 and 2^k - 1 only in the hash part (hash_search up to maxinteger)
@@ -140,14 +140,14 @@ do
   t[0] = 0
   for k = 1, 62 do t[(1 << k) - 1] = k end
   t[math.maxinteger - 1] = "top"
-  assert(#t == math.maxinteger, "hash_search stops at maxinteger")
+  assert(rawlen(t) == math.maxinteger, "hash_search stops at maxinteger")
   t[math.maxinteger - 1] = nil
-  assert(isborder(t, #t), "hash_search binary search border")
-  assert(#t >= 1 << 62, "hash_search border past 2^62")
+  assert(isborder(t, rawlen(t)), "hash_search binary search border")
+  assert(rawlen(t) >= 1 << 62, "hash_search border past 2^62")
 end
 
--- __len is still used
-assert(#setmetatable({}, {__len = function() return 42 end}) == 42, "__len")
+-- __len is still used by table.*
+assert(select("#", table.unpack(setmetatable({}, {__len = function() return 2 end}))) == 2, "__len")
 
 -- next / pairs visit each key once
 do
@@ -175,7 +175,7 @@ end
 -- ipairs
 do
   local got = {}
-  for i, v in ipairs({"a", "b", "c", nil, "e"}) do got[#got] = i .. v end
+  for i, v in ipairs({"a", "b", "c", nil, "e"}) do got[rawlen(got)] = i .. v end
   assert(table.concat(got, ",") == "0a,1b,2c", "ipairs order")
   local n = 0
   for _ in ipairs({}) do n = n + 1 end
@@ -186,24 +186,24 @@ do
   assert(start == -1, "ipairs control start")
   local proxy = setmetatable({}, {__index = function(_, i) if i < 3 then return i * 10 end end})
   got = {}
-  for i, v in ipairs(proxy) do got[#got] = v end
-  assert(#got == 3 and got[0] == 0 and got[2] == 20, "ipairs __index")
+  for i, v in ipairs(proxy) do got[rawlen(got)] = v end
+  assert(rawlen(got) == 3 and got[0] == 0 and got[2] == 20, "ipairs __index")
 end
 
 -- table.insert
 do
   local t = {}
   table.insert(t, "a")
-  assert(t[0] == "a" and #t == 1, "insert append empty")
+  assert(t[0] == "a" and rawlen(t) == 1, "insert append empty")
   table.insert(t, "b")
   assert(same(t, {"a", "b"}), "insert append")
   table.insert(t, 0, "z")
   assert(same(t, {"z", "a", "b"}), "insert front")
   table.insert(t, 1, "m")
   assert(same(t, {"z", "m", "a", "b"}), "insert middle")
-  table.insert(t, #t, "end")
-  assert(same(t, {"z", "m", "a", "b", "end"}), "insert at #t")
-  assert(errs("position out of bounds", table.insert, t, #t + 1, "x"), "insert past end")
+  table.insert(t, rawlen(t), "end")
+  assert(same(t, {"z", "m", "a", "b", "end"}), "insert at rawlen(t)")
+  assert(errs("position out of bounds", table.insert, t, rawlen(t) + 1, "x"), "insert past end")
   assert(errs("position out of bounds", table.insert, t, -1, "x"), "insert negative")
   assert(errs("wrong number of arguments", table.insert, t, 0, 1, 2), "insert arg count")
   local e = {}
@@ -216,16 +216,16 @@ do
   local t = {"a", "b", "c", "d"}
   assert(table.remove(t) == "d" and same(t, {"a", "b", "c"}), "remove last")
   assert(table.remove(t, 0) == "a" and same(t, {"b", "c"}), "remove first")
-  assert(table.remove(t, 1) == "c" and same(t, {"b"}), "remove at #t-1")
-  assert(table.remove(t, #t) == nil and same(t, {"b"}), "remove at #t")
-  assert(errs("position out of bounds", table.remove, t, #t + 1), "remove past #t")
+  assert(table.remove(t, 1) == "c" and same(t, {"b"}), "remove at rawlen(t)-1")
+  assert(table.remove(t, rawlen(t)) == nil and same(t, {"b"}), "remove at rawlen(t)")
+  assert(errs("position out of bounds", table.remove, t, rawlen(t) + 1), "remove past rawlen(t)")
   assert(errs("position out of bounds", table.remove, t, -2), "remove negative")
-  assert(table.remove(t) == "b" and #t == 0, "remove to empty")
+  assert(table.remove(t) == "b" and rawlen(t) == 0, "remove to empty")
   assert(table.remove(t) == nil, "remove empty")
-  assert(table.remove(t, 0) == nil and #t == 0, "remove 0 on empty")
+  assert(table.remove(t, 0) == nil and rawlen(t) == 0, "remove 0 on empty")
   assert(errs("position out of bounds", table.remove, t, 1), "remove 1 on empty")
   local n = {[-1] = "neg"}
-  assert(table.remove(n) == "neg" and n[-1] == nil, "remove on empty touches t[#t-1]")
+  assert(table.remove(n) == "neg" and n[-1] == nil, "remove on empty touches t[rawlen(t)-1]")
 end
 
 -- table.move
@@ -239,7 +239,7 @@ do
   local b = table.move({1, 2, 3}, 0, 2, 0, {})
   assert(same(b, {1, 2, 3}), "move to other table")
   local c = table.move({1, 2, 3}, 0, -1, 0, {})
-  assert(#c == 0, "move empty range")
+  assert(rawlen(c) == 0, "move empty range")
   local d = table.move({1, 2, 3}, 1, 2, 5, {})
   assert(d[5] == 2 and d[6] == 3 and d[0] == nil, "move offsets")
 end
@@ -295,7 +295,7 @@ do
   local r = {}
   for i = 0, 999 do r[i] = math.random(-500, 500) end
   table.sort(r)
-  assert(#r == 1000 and r[-1] == nil and r[1000] == nil, "sort big bounds")
+  assert(rawlen(r) == 1000 and r[-1] == nil and r[1000] == nil, "sort big bounds")
   for i = 1, 999 do assert(r[i - 1] <= r[i], "sort big order") end
 end
 
@@ -363,17 +363,17 @@ do
   assert(s:match("()", 5) == 5, "position capture at end")
 
   local out = {}
-  for p in ("abc"):gmatch("()") do out[#out] = p end
+  for p in ("abc"):gmatch("()") do out[rawlen(out)] = p end
   assert(table.concat(out, ",") == "0,1,2,3", "gmatch positions")
   out = {}
-  for w in ("one two three"):gmatch("%a+", 4) do out[#out] = w end
+  for w in ("one two three"):gmatch("%a+", 4) do out[rawlen(out)] = w end
   assert(table.concat(out, ",") == "two,three", "gmatch init")
   out = {}
-  for w in ("ab"):gmatch(".", -1) do out[#out] = w end
+  for w in ("ab"):gmatch(".", -1) do out[rawlen(out)] = w end
   assert(table.concat(out) == "b", "gmatch negative init")
   out = {}
-  for w in ("ab"):gmatch(".", 10) do out[#out] = w end
-  assert(#out == 0, "gmatch init past end")
+  for w in ("ab"):gmatch(".", 10) do out[rawlen(out)] = w end
+  assert(rawlen(out) == 0, "gmatch init past end")
 
   assert(("abc"):gsub("()", "%1") == "0a1b2c3", "gsub position capture")
   assert(("hello world"):gsub("(%w+) (%w+)", "%2 %1") == "world hello", "gsub %n unchanged")
@@ -396,13 +396,13 @@ do
   assert(z == "ab" and zn == 3, "unpack z")
   local s1, n1 = string.unpack("s1", string.pack("s1", "xyz"))
   assert(s1 == "xyz" and n1 == 4, "unpack s1")
-  assert(string.packsize("i4") == 4 and #data == 3, "sizes unchanged")
+  assert(string.packsize("i4") == 4 and len(data) == 3, "sizes unchanged")
 end
 
 -- utf8
 do
   local s = "a\u{3B1}b\u{10348}"  -- bytes: a(0) α(1,2) b(3) 𐍈(4..7)
-  assert(#s == 8, "utf8 fixture")
+  assert(len(s) == 8, "utf8 fixture")
   assert(utf8.len(s) == 4, "utf8.len")
   assert(utf8.len(s, 1) == 3, "utf8.len i")
   assert(utf8.len(s, 0, 0) == 1, "utf8.len i j")
@@ -447,7 +447,7 @@ do
   assert(errs("position out of bounds", utf8.offset, s, 1, 9), "offset i past end")
 
   local got = {}
-  for p, c in utf8.codes(s) do got[#got] = p .. ":" .. c end
+  for p, c in utf8.codes(s) do got[rawlen(got)] = p .. ":" .. c end
   assert(table.concat(got, ",") == "0:97,1:945,3:98,4:66376", "utf8.codes positions")
   got = 0
   for _ in utf8.codes("") do got = got + 1 end
@@ -490,7 +490,7 @@ end
 do
   assert(select(1, "a", "b") == "a" and select(-1, "a", "b") == "b", "select ordinals")
   assert(select("#", "a", nil) == 2, "select #")
-  assert(#"abc" == 3 and ("abc"):len() == 3, "string length")
+  assert(len("abc") == 3 and ("abc"):len() == 3, "string length")
   assert(rawlen({1, 2}) == 2 and rawlen("xy") == 2, "rawlen")
   assert(string.format("%d-%s", 1, "x") == "1-x", "format args")
   assert(debug.getinfo(1, "l").currentline > 0, "debug level 1")
@@ -502,10 +502,10 @@ do
   assert(type(reg[1]) == "thread", "registry[LUA_RIDX_MAINTHREAD]")
   assert(reg[2] == _G, "registry[LUA_RIDX_GLOBALS]")
   assert(math.type(reg[0]) == "integer", "registry[0] is the ref free list")
-  assert(#reg >= 3, "registry sequence covers reserved keys")
+  assert(rawlen(reg) >= 3, "registry sequence covers reserved keys")
 
   assert(type(package.searchers[0]) == "function", "searchers[0]")
-  assert(#package.searchers == 4, "searchers count")
+  assert(rawlen(package.searchers) == 4, "searchers count")
   package.preload.zero_mod = function() return 42 end
   assert(require("zero_mod") == 42, "require through preload")
   table.insert(package.searchers, function(name)
@@ -530,7 +530,7 @@ do
         error("stress mismatch at key " .. k .. " step " .. step)
       end
     end
-    local n = #t
+    local n = rawlen(t)
     assert((n == 0 and model["0"] == nil) or
            (model[tostring(n - 1)] != nil and model[tostring(n)] == nil),
            "stress border step " .. step)
@@ -586,7 +586,7 @@ do
       m[tostring(mn - 1)] = nil
       mn = mn - 1
     end
-    assert(#t == mn, "list stress len step " .. step)
+    assert(rawlen(t) == mn, "list stress len step " .. step)
     if step % 25 == 0 then
       for i = 0, mn - 1 do assert(t[i] == m[tostring(i)], "list stress value step " .. step) end
     end

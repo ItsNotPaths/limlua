@@ -83,10 +83,10 @@ do
   assert(reads == 2 and writes == 2 and store.v == "2!", "one read, one write")
 
   local order = {}
-  local function mark(tag, v) order[#order] = tag; return v end
+  local function mark(tag, v) order[len(order)] = tag; return v end
   local u = {[0] = 1}
   mark("t", u)[mark("k", 0)] += mark("e", 5)
-  assert(#order == 3 and order[0] == "t" and order[1] == "k" and order[2] == "e",
+  assert(len(order) == 3 and order[0] == "t" and order[1] == "k" and order[2] == "e",
          "target before right side")
   assert(u[0] == 6, "ordered result")
 end
@@ -115,15 +115,15 @@ do
   local seen = {}
   local mt = {}
   for _, ev in ipairs{"add", "sub", "mul", "div", "mod", "concat"} do
-    mt["__" .. ev] = function(a, b) seen[#seen] = ev; return a end
+    mt["__" .. ev] = function(a, b) seen[len(seen)] = ev; return a end
   end
   local o = setmetatable({}, mt)
   local r = o
   r += 1; r -= 1; r *= 1; r /= 1; r %= 1; r ..= 1
   assert(rawequal(r, o), "metamethod result assigned")
-  assert(#seen == 6, "all six metamethods")
+  assert(len(seen) == 6, "all six metamethods")
   local want = {"add", "sub", "mul", "div", "mod", "concat"}
-  for i = 0, #want - 1 do assert(seen[i] == want[i], "metamethod " .. want[i]) end
+  for i = 0, len(want) - 1 do assert(seen[i] == want[i], "metamethod " .. want[i]) end
 
   local sides
   local cat = setmetatable({}, {__concat = function(a, b) sides = {a, b}; return "c" end})
