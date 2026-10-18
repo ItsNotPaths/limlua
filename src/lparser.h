@@ -133,6 +133,11 @@ typedef struct Dyndata {
   } actvar;
   Labellist gt;  /* list of pending gotos */
   Labellist label;   /* list of active labels */
+  struct {  /* code of c-style for steps, waiting to go after their body */
+    Instruction *arr;
+    int n;
+    int size;
+  } step;
 } Dyndata;
 
 

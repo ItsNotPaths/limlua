@@ -45,6 +45,21 @@ local function collect(f) {
   assert(i == "outer", "i is scoped to the loop")
 }
 
+-- steps of any shape run after the body
+{
+  assert(collect(function(put) { for i = 0; i < 9; i = i < 4 && i + 1 || i + 2 { put(i) } }) == "0 1 2 3 4 6 8",
+         "step with and/or")
+  assert(collect(function(put) {
+    for i = 0; i < 3; i += 1 { for j = 0; j < i; j += 1 { for k = 0; k < 1; k += 1 { put(i .. j) } } }
+  }) == "10 20 21", "nested loops")
+  local n = 0
+  local function each(f) { f() }
+  for i = 0; i < 3; each(function() { for j = 0; j < 2; j += 1 { n += 1 } i += 1 }) { }
+  assert(n == 6, "a loop inside a function in the step")
+  local ok, msg = pcall(load("for i = 0; i < 3;\n  i = i + nil { }", "=src"))
+  assert(!ok && has(msg, "src:2:"), "step errors report the step's line: " .. tostring(msg))
+}
+
 -- jumps
 {
   assert(collect(function(put) { for i = 0; i < 10; i += 1 { if i % 3 != 0 { continue } put(i) } }) == "0 3 6 9",

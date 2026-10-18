@@ -376,6 +376,13 @@ static void removelastinstruction (FuncState *fs) {
 }
 
 
+/* drop the code from 'pc' on, so it can be emitted again elsewhere */
+void luaK_cutcode (FuncState *fs, int pc) {
+  while (fs->pc > pc)
+    removelastinstruction(fs);
+}
+
+
 /*
 ** Emit instruction 'i', checking for array sizes and saving also its
 ** line information. Return 'i' position.
