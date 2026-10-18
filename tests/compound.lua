@@ -1,13 +1,13 @@
 -- compound assignment: += -= *= /= %= ..=
 
-local function syntax_err(src, near)
+local function syntax_err(src, near) {
   local f, msg = load(src)
-  if f != nil then return false end
+  if f != nil { return false }
   return near == nil or string.find(msg, near, 0, true) != nil
-end
+}
 
 -- every operator on a local
-do
+{
   local x = 10
   x += 5;   assert(x == 15, "+=")
   x -= 3;   assert(x == 12, "-=")
@@ -18,31 +18,31 @@ do
   local i = 7
   i %= 4;   assert(i == 3 and math.type(i) == "integer", "integer %=")
   i /= 1;   assert(math.type(i) == "float", "/= is float division")
-end
+}
 
 -- upvalues
-do
+{
   local n, s = 1, "a"
-  local function bump()
+  local function bump() {
     n += 1; n *= 10; n -= 5; n /= 3; n %= 4
     s ..= "b"
-  end
+  }
   bump()
   assert(n == 15 / 3 % 4 and s == "ab", "upvalue targets")
-end
+}
 
 -- globals
-do
+{
   G_OPS = 2
   G_OPS += 1; G_OPS *= 4; G_OPS -= 2; G_OPS /= 5; G_OPS %= 1.5
   assert(G_OPS == 0.5, "global targets")
   G_OPS ..= "!"
   assert(G_OPS == "0.5!", "global ..=")
   G_OPS = nil
-end
+}
 
 -- fields and indexed targets
-do
+{
   local t = {n = 1, s = "x", [0] = 2, [true] = 3}
   t.n += 1; t.n *= 3; t.n -= 1; t.n /= 5; t.n %= 0.75
   assert(t.n == 0.25, "field targets")
@@ -55,14 +55,14 @@ do
   local deep = {a = {b = {[0] = {c = 1}}}}
   deep.a.b[0].c += 9
   assert(deep.a.b[0].c == 10, "nested target")
-end
+}
 
 -- table and key subexpressions run once
-do
+{
   local t = {k = {[5] = 10}}
   local tcalls, kcalls = 0, 0
-  local function f() tcalls += 1; return t end
-  local function g() kcalls += 1; return 5 end
+  local function f() { tcalls += 1; return t }
+  local function g() { kcalls += 1; return 5 }
   f().k[g()] += 3
   f().k[g()] -= 1
   f().k[g()] *= 2
@@ -75,24 +75,24 @@ do
   local reads, writes = 0, 0
   local store = {v = 1}
   local proxy = setmetatable({}, {
-    __index = function(_, key) reads += 1; return store[key] end,
-    __newindex = function(_, key, v) writes += 1; store[key] = v end,
+    __index = function(_, key) { reads += 1; return store[key] },
+    __newindex = function(_, key, v) { writes += 1; store[key] = v },
   })
   proxy.v += 1
   proxy["v"] ..= "!"
   assert(reads == 2 and writes == 2 and store.v == "2!", "one read, one write")
 
   local order = {}
-  local function mark(tag, v) order[len(order)] = tag; return v end
+  local function mark(tag, v) { order[len(order)] = tag; return v }
   local u = {[0] = 1}
   mark("t", u)[mark("k", 0)] += mark("e", 5)
   assert(len(order) == 3 and order[0] == "t" and order[1] == "k" and order[2] == "e",
          "target before right side")
   assert(u[0] == 6, "ordered result")
-end
+}
 
 -- right side is one parenthesized expression
-do
+{
   local x = 2
   x *= 1 + 2;       assert(x == 6, "x * (1 + 2)")
   x -= 1 - 1;       assert(x == 6, "x - (1 - 1)")
@@ -105,40 +105,40 @@ do
   local s = "a"
   s ..= "b" .. "c"; assert(s == "abc", "..= with concat chain")
   s ..= 1 + 1;      assert(s == "abc2", "..= of sum")
-  local function two() return 5, 6 end
+  local function two() { return 5, 6 }
   local z = 1
   z += two();       assert(z == 6, "call truncated to one value")
-end
+}
 
 -- metamethods fire through compound forms
-do
+{
   local seen = {}
   local mt = {}
-  for _, ev in ipairs{"add", "sub", "mul", "div", "mod", "concat"} do
-    mt["__" .. ev] = function(a, b) seen[len(seen)] = ev; return a end
-  end
+  for _, ev in ipairs({"add", "sub", "mul", "div", "mod", "concat"}) {
+    mt["__" .. ev] = function(a, b) { seen[len(seen)] = ev; return a }
+  }
   local o = setmetatable({}, mt)
   local r = o
   r += 1; r -= 1; r *= 1; r /= 1; r %= 1; r ..= 1
   assert(rawequal(r, o), "metamethod result assigned")
   assert(len(seen) == 6, "all six metamethods")
   local want = {"add", "sub", "mul", "div", "mod", "concat"}
-  for i = 0, len(want) - 1 do assert(seen[i] == want[i], "metamethod " .. want[i]) end
+  for i = 0, len(want) - 1 { assert(seen[i] == want[i], "metamethod " .. want[i]) }
 
   local sides
-  local cat = setmetatable({}, {__concat = function(a, b) sides = {a, b}; return "c" end})
+  local cat = setmetatable({}, {__concat = function(a, b) { sides = {a, b}; return "c" }})
   local s = "pre"
   s ..= cat
   assert(s == "c" and sides[0] == "pre" and rawequal(sides[1], cat), "__concat operands in order")
 
-  local ok, msg = pcall(function() local n = nil; n += 1 end)
+  local ok, msg = pcall(function() { local n = nil; n += 1 })
   assert(not ok and string.find(msg, "local 'n'", 0, true), "error names the local")
-  ok, msg = pcall(function() local t = {}; t.f += 1 end)
+  ok, msg = pcall(function() { local t = {}; t.f += 1 })
   assert(not ok and string.find(msg, "field 'f'", 0, true), "error names the field")
-end
+}
 
 -- syntax errors
-do
+{
   assert(syntax_err("a, b += 1", "'=' expected near '+='"), "multiple targets")
   assert(syntax_err("x +=", "<eof>"), "missing right side")
   assert(syntax_err("x += 1, 2", "','"), "right side list")
@@ -153,13 +153,13 @@ do
   assert(syntax_err("return x += 1"), "not an expression")
   assert(load("x = 0 x += 1 y = x") != nil, "statements on one line")
   assert(syntax_err("x += += 1", "'+='"), "token name")
-  for _, op in ipairs{"+=", "-=", "*=", "/=", "%=", "..="} do
+  for _, op in ipairs({"+=", "-=", "*=", "/=", "%=", "..="}) {
     assert(syntax_err("x " .. op .. " " .. op .. " 1", "'" .. op .. "'"), "token name " .. op)
-  end
-end
+  }
+}
 
 -- lexing next to existing tokens
-do
+{
   local x = 5
   x -= 1 --comment
   assert(x == 4, "-= then comment")
@@ -174,21 +174,21 @@ do
   local a = 1
   a = 2
   assert(a == 2 and a != 3, "= and == unchanged")
-  local function v(...)
+  local function v(...) {
     local s = ""
     s..=...
     s ..= select("#", ...)
     return s, ...
-  end
+  }
   local s, first = v("p", "q")
   assert(s == "p2" and first == "p", "..= beside ...")
   assert(1 .. 2 == "12" and "a".."b" == "ab", ".. unchanged")
   local y = 1
   y+=1 y*=3 y..="" assert(y == "6", "no spaces")
-end
+}
 
 -- bitwise operators still work
-do
+{
   assert((5 | 3) == 7 and (5 & 3) == 1 and (5 ~ 3) == 6, "| & ~")
   assert(~0 == -1 and ~~5 == 5, "unary ~")
   assert(1 << 4 == 16 and 256 >> 4 == 16, "<< >>")
@@ -198,4 +198,4 @@ do
   local x = 12
   x = x & 10 | 1
   assert(x == 9, "bitwise in assignment")
-end
+}
