@@ -64,6 +64,7 @@ typedef struct BlockCnt {
 */
 static void statement (LexState *ls);
 static void expr (LexState *ls, expdesc *v);
+static void exprstat (LexState *ls, TString *name);
 
 
 static l_noret error_expected (LexState *ls, int token) {
@@ -1679,17 +1680,16 @@ static void forbody (LexState *ls, int base, int line, int nvars, int isgen) {
 }
 
 
-static void fornum (LexState *ls, TString *varname, int line) {
-  /* fornum -> NAME = exp,exp[,exp] forbody */
+static void fornum (LexState *ls, TString *varname, int base, int line) {
+  /* fornum -> NAME = exp,exp[,exp] forbody; initial value already at 'base' */
   FuncState *fs = ls->fs;
-  int base = fs->freereg;
   new_localvarliteral(ls, "(for state)");
   new_localvarliteral(ls, "(for state)");
   new_localvarliteral(ls, "(for state)");
   new_localvar(ls, varname);
-  checknext(ls, '=');
-  exp1(ls);  /* initial value */
-  checknext(ls, ',');
+  if (ls->t.token != ',')
+    luaX_syntaxerror(ls, "',' (numeric for) or ';' (c-style for) expected");
+  luaX_next(ls);
   exp1(ls);  /* limit */
   if (testnext(ls, ','))
     exp1(ls);  /* optional step */
@@ -1730,17 +1730,70 @@ static void forlist (LexState *ls, TString *indexname) {
 }
 
 
+/*
+** forc -> NAME = exp ';' [cond] ';' [stat] '{' block '}'
+** Code is laid out in source order: cond, step, body. Each pass gets its
+** own copy of the variable, so closures in the body see that pass's value.
+*/
+static void forc (LexState *ls, TString *varname, int base, int line) {
+  FuncState *fs = ls->fs;
+  BlockCnt *loop = fs->bl;
+  BlockCnt bl;
+  int condinit, stepinit, tobody;
+  new_localvar(ls, varname);
+  adjustlocalvars(ls, 1);  /* at 'base'; cond and step use this one */
+  checknext(ls, ';');
+  condinit = luaK_getlabel(fs);
+  if (ls->t.token != ';')  /* a false condition is a 'break' */
+    newgotoentry(ls, luaS_newliteral(ls->L, "break"), line, cond(ls));
+  if (ls->t.token != ';')
+    luaX_syntaxerror(ls, "';' expected: for i = 0; cond; step { }");
+  luaX_next(ls);
+  tobody = luaK_jump(fs);
+  stepinit = luaK_getlabel(fs);
+  if (ls->t.token != '{') {
+    if (ls->t.token != TK_NAME && ls->t.token != '(')
+      luaX_syntaxerror(ls, "the step of a for is an assignment or a call, like 'i += 1'");
+    exprstat(ls, NULL);
+    fs->freereg = luaY_nvarstack(fs);
+  }
+  luaK_jumpto(fs, condinit);
+  luaK_patchtohere(fs, tobody);
+  enterblock(fs, &bl, 0);
+  new_localvar(ls, varname);  /* this pass's copy, at 'base + 1' */
+  luaK_codeABC(fs, OP_MOVE, base + 1, base, 0);
+  luaK_reserveregs(fs, 1);
+  adjustlocalvars(ls, 1);
+  openblock(ls);
+  block(ls);
+  continuelabels(ls, loop);
+  luaK_codeABC(fs, OP_MOVE, base, base + 1, 0);  /* copy back for the step */
+  leaveblock(fs);
+  luaK_jumpto(fs, stepinit);
+}
+
+
 static void forstat (LexState *ls, int line, TString *name) {
-  /* forstat -> FOR (fornum | forlist) '}' */
+  /* forstat -> FOR (fornum | forc | forlist) '}' */
   FuncState *fs = ls->fs;
   TString *varname;
   BlockCnt bl;
   enterblock(fs, &bl, 1);  /* scope for loop and control variables */
   bl.name = name;
   luaX_next(ls);  /* skip 'for' */
+  if (ls->t.token == '(')
+    luaX_syntaxerror(ls,
+        "lim's for has no parentheses: for i = 0; i < n; i += 1 { }");
   varname = str_checkname(ls);  /* first variable name */
   switch (ls->t.token) {
-    case '=': fornum(ls, varname, line); break;
+    case '=': {
+      int base = fs->freereg;
+      luaX_next(ls);  /* skip '=' */
+      exp1(ls);  /* initial value, at 'base' */
+      if (ls->t.token == ';') forc(ls, varname, base, line);
+      else fornum(ls, varname, base, line);
+      break;
+    }
     case ',': case TK_IN: forlist(ls, varname); break;
     default: luaX_syntaxerror(ls, "'=' or 'in' expected");
   }
